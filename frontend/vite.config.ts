@@ -16,6 +16,6 @@ export default defineConfig({
   },
   // `vite preview` serves the built dashboard for start.sh (native mode) and reuses the proxy above.
   // Any Host header is accepted so it answers on a public IP or an EC2 DNS name.
-  preview: { host: true, port: 8080, allowedHosts: true },
+  preview: { host: true, port: 9063, allowedHosts: true },
   build: { chunkSizeWarningLimit: 1200 },
 });

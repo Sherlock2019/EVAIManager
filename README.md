@@ -109,7 +109,7 @@ No GPU, no external LLM and no API keys are required.
 ./start.sh stop
 ```
 
-Both services listen on `0.0.0.0` and the script prints the URLs with the machine's public IP. On EC2, allow inbound TCP 8080 in the security group, then open `http://<public-ip>:8080`. Port 8000 is only needed for the API docs. The services keep running after you log out of SSH; logs are in `.run/`.
+Both services listen on `0.0.0.0` and the script prints the URLs with the machine's public IP. On EC2, allow inbound TCP 9063 in the security group, then open `http://<public-ip>:9063`. Port 8000 is only needed for the API docs. The services keep running after you log out of SSH; logs are in `.run/`.
 
 ### Docker (one command)
 
@@ -117,7 +117,7 @@ Both services listen on `0.0.0.0` and the script prints the URLs with the machin
 docker compose up --build
 ```
 
-- Dashboard: <http://localhost:8080>
+- Dashboard: <http://localhost:9063>
 - API docs: <http://localhost:8000/api/docs>
 
 The first start generates the synthetic world (a few seconds) and writes it to `./data`. Ports and world size can be changed by copying `.env.example` to `.env`.

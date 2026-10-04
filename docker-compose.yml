@@ -2,7 +2,7 @@
 #
 #   docker compose up --build
 #
-# Dashboard: http://localhost:8080      API docs: http://localhost:8000/api/docs
+# Dashboard: http://localhost:9063     API docs: http://localhost:8000/api/docs
 
 services:
   backend:
@@ -26,5 +26,5 @@ services:
       backend:
         condition: service_healthy
     ports:
-      - "${FRONTEND_PORT:-8080}:80"
+      - "${FRONTEND_PORT:-9063}:80"
     restart: unless-stopped

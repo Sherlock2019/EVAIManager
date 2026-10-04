@@ -8,7 +8,7 @@
 #   ./start.sh status     show what is running and the URLs
 #
 # Both services listen on 0.0.0.0, so on an AWS EC2 instance the dashboard is
-# reachable at http://<public-ip>:8080 once the security group allows inbound
+# reachable at http://<public-ip>:9063 once the security group allows inbound
 # TCP on that port. Ports come from .env (FRONTEND_PORT, BACKEND_PORT).
 set -euo pipefail
 
@@ -21,7 +21,7 @@ if [[ -f .env ]]; then
   . ./.env
   set +a
 fi
-FRONTEND_PORT="${FRONTEND_PORT:-8080}"
+FRONTEND_PORT="${FRONTEND_PORT:-9063}"
 BACKEND_PORT="${BACKEND_PORT:-8000}"
 export FRONTEND_PORT BACKEND_PORT
 
@@ -60,6 +60,12 @@ wait_for() { # url, seconds
   done
 }
 
+# free unless something other than our own compose stack is listening on it
+port_free() {
+  docker compose ps --format '{{.Ports}}' 2>/dev/null | grep -q ":$1->" && return 0
+  ! (ss -ltn 2>/dev/null | grep -qE "[:.]$1[[:space:]]")
+}
+
 alive() { [[ -f "$RUN_DIR/$1.pid" ]] && kill -0 "$(cat "$RUN_DIR/$1.pid")" 2>/dev/null; }
 
 print_urls() {
@@ -80,9 +86,12 @@ EOF
 
 start_docker() {
   docker_usable || die "Docker is not usable here (is the daemon running, and is this user in the docker group?). Try: ./start.sh native"
+  stop_native quiet   # a native run left over would hold the same ports
+  port_free "$BACKEND_PORT" || die "Port $BACKEND_PORT is already in use. Set BACKEND_PORT in .env to a free port."
+  port_free "$FRONTEND_PORT" || die "Port $FRONTEND_PORT is already in use. Set FRONTEND_PORT in .env to a free port."
   say "Building and starting containers…"
-  docker compose up --build -d
   mkdir -p "$RUN_DIR" && echo docker > "$MODE_FILE"
+  docker compose up --build -d
   say "Waiting for the dashboard…"
   wait_for "http://127.0.0.1:$FRONTEND_PORT/api/health" 240 || die "Not healthy after 4 minutes. Check: docker compose logs"
   say "Running in Docker."
