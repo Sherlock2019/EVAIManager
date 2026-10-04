@@ -1,9 +1,10 @@
 import { ArrowRight, ChevronDown, ChevronUp, HelpCircle, Play } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { runDemo } from "../lib/demo";
-import { APP_PURPOSE, MAIN_FEATURES, PAGE_GUIDE, PROBLEMS } from "../lib/guide";
-import { Badge, Button } from "./ui";
+import { C } from "../lib/format";
+import { APP_PURPOSE, MAIN_FEATURES, PAGE_GUIDE, PITCH, PROBLEMS } from "../lib/guide";
+import { Button } from "./ui";
 
 const HIDE_KEY = "guide-hidden";
 
@@ -25,6 +26,32 @@ function Steps({ steps }: { steps: string[] }) {
         </li>
       ))}
     </ol>
+  );
+}
+
+function PitchCard({ n, color, label, lead, children }: { n: number; color: string; label: string; lead: string; children: ReactNode }) {
+  return (
+    <div className="relative border-b border-line px-5 py-4 last:border-b-0 md:border-r md:last:border-r-0 xl:border-b-0" style={{ boxShadow: `inset 0 3px 0 ${color}` }}>
+      <div className="flex items-center gap-2">
+        <span className="num flex h-6 w-6 items-center justify-center rounded-md text-xs font-bold text-abyss" style={{ background: color }}>{n}</span>
+        <span className="font-mono text-xs font-bold uppercase tracking-[0.14em]" style={{ color }}>{label}</span>
+      </div>
+      <p className="mt-2.5 text-[15px] font-semibold leading-snug tracking-tight text-ink">{lead}</p>
+      <div className="mt-3">{children}</div>
+    </div>
+  );
+}
+
+function Bullets({ items, color }: { items: string[]; color: string }) {
+  return (
+    <ul className="space-y-1.5">
+      {items.map((item) => (
+        <li key={item} className="flex gap-2 text-xs leading-snug text-ink-2">
+          <span className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: color }} />
+          <span>{item}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -80,17 +107,43 @@ export function AppGuide() {
   const navigate = useNavigate();
   return (
     <section className="panel overflow-hidden">
+      {/* the four questions a first-time visitor asks, in order */}
+      <div className="grid border-b border-line md:grid-cols-2 xl:grid-cols-4">
+        <PitchCard n={1} color={C.accent} label={PITCH.what.label} lead={PITCH.what.lead}>
+          <Bullets items={PITCH.what.points} color={C.accent} />
+        </PitchCard>
+        <PitchCard n={2} color={C.good} label={PITCH.benefits.label} lead={PITCH.benefits.lead}>
+          <Bullets items={PITCH.benefits.points} color={C.good} />
+        </PitchCard>
+        <PitchCard n={3} color={C.warn} label={PITCH.who.label} lead={PITCH.who.lead}>
+          <ul className="space-y-1.5">
+            {PITCH.who.roles.map((r) => (
+              <li key={r.role}>
+                <Link to={r.to} className="group block text-xs leading-snug">
+                  <span className="font-medium text-ink group-hover:text-accent">{r.role}</span>
+                  <span className="text-ink-3"> get {r.gets}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </PitchCard>
+        <PitchCard n={4} color={C.info} label={PITCH.how.label} lead={PITCH.how.lead}>
+          <ol className="space-y-1.5">
+            {PITCH.how.steps.map((s, i) => (
+              <li key={s.name} className="flex gap-2 text-xs leading-snug">
+                <span className="num mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-3xs font-bold text-abyss" style={{ background: C.info }}>{i + 1}</span>
+                <span><span className="font-medium text-ink">{s.name}.</span> <span className="text-ink-3">{s.text}</span></span>
+              </li>
+            ))}
+          </ol>
+        </PitchCard>
+      </div>
+
       <div className="grid gap-x-8 gap-y-4 border-b border-line px-5 py-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <div>
-          <div className="label text-accent">What this app is for</div>
+          <div className="label text-accent">In one line</div>
           <h2 className="mt-1 text-xl font-semibold tracking-tight text-ink">{APP_PURPOSE.headline}</h2>
           <p className="mt-2 text-[13px] leading-relaxed text-ink-2">{APP_PURPOSE.summary}</p>
-          <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            <span className="label mr-1">Built for</span>
-            {APP_PURPOSE.audience.map((a) => (
-              <Badge key={a} tone="accent">{a}</Badge>
-            ))}
-          </div>
           <Button variant="primary" className="mt-4" onClick={() => void runDemo(navigate)}>
             <Play size={12} fill="currentColor" /> Start with the 2-minute guided demo
           </Button>

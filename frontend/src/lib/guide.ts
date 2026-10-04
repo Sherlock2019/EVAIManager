@@ -4,7 +4,50 @@ export const APP_PURPOSE = {
   headline: "Turn EV fleet data into decisions",
   summary:
     "A working demo of how one EV fleet's data (cameras, telemetry, GPS, passenger and charging signals) can drive three kinds of decision: which ADAS labels a human must check, which vehicles to service before they fail, and where to put EVs and chargers.",
-  audience: ["ADAS data teams", "Fleet operations", "Charging network planners", "Ride-hailing drivers"],
+};
+
+/** The four questions a first-time visitor asks, answered at the top of the Overview. */
+export const PITCH = {
+  what: {
+    label: "What it does",
+    lead: "Watches one EV fleet and tells each team what to do next.",
+    points: [
+      "Labels driving footage and sends only the doubtful frames to a person",
+      "Predicts which vehicles will need service, and why",
+      "Forecasts where passengers and EVs will be, hour by hour",
+      "Recommends where chargers should go and how big they should be",
+    ],
+  },
+  benefits: {
+    label: "So what: the benefits",
+    lead: "Decisions made earlier, from evidence, with fewer people in the loop.",
+    points: [
+      "Less manual labeling work, and cleaner training data",
+      "Service booked before a breakdown, not after",
+      "Shorter passenger waits and fewer idle EVs",
+      "Charger money spent where demand is, not where a plan guessed",
+    ],
+  },
+  who: {
+    label: "For who",
+    lead: "Four teams, one shared picture of the fleet.",
+    roles: [
+      { role: "ADAS data teams", gets: "a review queue of only the uncertain labels", to: "/adas/review" },
+      { role: "Fleet operations", gets: "a ranked list of vehicles to service", to: "/fleet/maintenance" },
+      { role: "Charging network planners", gets: "sites to add, expand, shrink or cancel", to: "/energy/charging" },
+      { role: "Ride-hailing drivers", gets: "the zone to be in, and when", to: "/energy/demand" },
+    ],
+  },
+  how: {
+    label: "How it does it",
+    lead: "The same four steps for every decision.",
+    steps: [
+      { name: "Collect", text: "Cameras, telemetry, GPS, passenger and charging signals from every vehicle" },
+      { name: "Predict", text: "AI scores each label, vehicle, zone and station, with reasons" },
+      { name: "Check", text: "A person confirms the decisions that matter" },
+      { name: "Act and learn", text: "The action is taken, and its result becomes new data" },
+    ],
+  },
 };
 
 export const PROBLEMS = [
