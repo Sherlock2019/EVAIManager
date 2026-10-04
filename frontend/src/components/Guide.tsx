@@ -2,7 +2,8 @@ import { ArrowRight, ChevronDown, ChevronUp, HelpCircle, Play } from "lucide-rea
 import { useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { runDemo } from "../lib/demo";
-import { C } from "../lib/format";
+import { C, fmtInt } from "../lib/format";
+import { useLive } from "../lib/live";
 import { APP_PURPOSE, MAIN_FEATURES, PAGE_GUIDE, PITCH, PROBLEMS } from "../lib/guide";
 import { Button } from "./ui";
 
@@ -31,7 +32,7 @@ function Steps({ steps }: { steps: string[] }) {
 
 function PitchCard({ n, color, label, lead, children }: { n: number; color: string; label: string; lead: string; children: ReactNode }) {
   return (
-    <div className="relative border-b border-line px-5 py-4 last:border-b-0 md:border-r md:last:border-r-0 xl:border-b-0" style={{ boxShadow: `inset 0 3px 0 ${color}` }}>
+    <div className="relative border-b border-line px-5 py-4 last:border-b-0 md:border-b-0 md:border-r md:last:border-r-0" style={{ boxShadow: `inset 0 3px 0 ${color}` }}>
       <div className="flex items-center gap-2">
         <span className="num flex h-6 w-6 items-center justify-center rounded-md text-xs font-bold text-abyss" style={{ background: color }}>{n}</span>
         <span className="font-mono text-xs font-bold uppercase tracking-[0.14em]" style={{ color }}>{label}</span>
@@ -105,13 +106,41 @@ export function PageGuide() {
 /** Overview section: what the app is for, the problems it solves, each main feature and how to use it. */
 export function AppGuide() {
   const navigate = useNavigate();
+  const s = useLive((state) => state.summary);
+  // each goal's current state, taken from the live simulation
+  const figures: Record<string, string> = s
+    ? {
+        cars: `${s.predicted_maintenance_cases} cars flagged · ${s.risk_counts.CRITICAL} critical`,
+        chargers: `${s.overloaded_stations} of ${s.charging_stations} stations overloaded`,
+        planning: `${s.recommended_new_sites} new sites recommended`,
+        rides: "24-hour forecast · 14 zones",
+        adas: `${s.auto_labeled_pct}% auto-labeled · ${fmtInt(s.review_queue)} to review`,
+      }
+    : {};
   return (
     <section className="panel overflow-hidden">
       {/* the four questions a first-time visitor asks, in order */}
-      <div className="grid border-b border-line md:grid-cols-2 xl:grid-cols-4">
+      <div className="border-b border-line">
         <PitchCard n={1} color={C.accent} label={PITCH.what.label} lead={PITCH.what.lead}>
-          <Bullets items={PITCH.what.points} color={C.accent} />
+          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+            {PITCH.what.goals.map((g) => (
+              <Link key={g.id} to={g.to} className="group flex flex-col rounded-md border border-line bg-raised px-3 py-2.5 transition-colors hover:border-accent/50">
+                <div className="flex items-start justify-between gap-2">
+                  <span className="label text-accent">{g.name}</span>
+                  <ArrowRight size={12} className="mt-0.5 shrink-0 text-ink-3 group-hover:text-accent" />
+                </div>
+                <p className="mt-1.5 text-[13px] font-semibold leading-snug text-ink">{g.goal}</p>
+                <p className="mt-1 flex-1 text-2xs leading-relaxed text-ink-3">{g.how}</p>
+                <div className="num mt-2 border-t border-line pt-1.5 text-2xs text-ink-2">
+                  <span className="label mr-1.5">In this demo</span>
+                  {figures[g.id] ?? "…"}
+                </div>
+              </Link>
+            ))}
+          </div>
         </PitchCard>
+      </div>
+      <div className="grid border-b border-line md:grid-cols-3">
         <PitchCard n={2} color={C.good} label={PITCH.benefits.label} lead={PITCH.benefits.lead}>
           <Bullets items={PITCH.benefits.points} color={C.good} />
         </PitchCard>

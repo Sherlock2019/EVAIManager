@@ -10,12 +10,43 @@ export const APP_PURPOSE = {
 export const PITCH = {
   what: {
     label: "What it does",
-    lead: "Watches one EV fleet and tells each team what to do next.",
-    points: [
-      "Labels driving footage and sends only the doubtful frames to a person",
-      "Predicts which vehicles will need service, and why",
-      "Forecasts where passengers and EVs will be, hour by hour",
-      "Recommends where chargers should go and how big they should be",
+    lead: "Five jobs, each with a concrete goal.",
+    goals: [
+      {
+        id: "cars",
+        name: "EV car maintenance management",
+        goal: "Service every at-risk vehicle before it breaks down.",
+        how: "Scores battery, motor, tires and brakes on each car, ranks the risky ones with reasons, and books the service.",
+        to: "/fleet/maintenance",
+      },
+      {
+        id: "chargers",
+        name: "EV charger management",
+        goal: "Keep every station at a healthy load, with no queues and no idle ports.",
+        how: "Tracks ports in use, flags overloaded and underused stations, and sizes each one to its busiest hour.",
+        to: "/energy/demand",
+      },
+      {
+        id: "planning",
+        name: "EV charger planning",
+        goal: "Build new chargers only where demand justifies them.",
+        how: "Scores candidate sites, sizes expansions, and marks planned sites that should be cancelled.",
+        to: "/energy/charging",
+      },
+      {
+        id: "rides",
+        name: "Passenger demand and EV positioning",
+        goal: "Have an EV where the next passenger is, at the hour they need it.",
+        how: "Forecasts pickups per zone for the next 24 hours and tells drivers where to be, and when.",
+        to: "/energy/demand",
+      },
+      {
+        id: "adas",
+        name: "ADAS data labeling",
+        goal: "Send a person only the labels the AI is unsure about.",
+        how: "AI labels every driving frame and scores its confidence; each human correction joins the next training dataset.",
+        to: "/adas/review",
+      },
     ],
   },
   benefits: {

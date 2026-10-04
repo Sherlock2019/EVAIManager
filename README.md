@@ -178,6 +178,36 @@ The demo is one process holding the world in memory. That is the right size for 
 
 The component-by-component version of this is in [Future production architecture](#future-production-architecture).
 
+## Next steps: POC → MVP → production
+
+This repository is the POC. The stages after it are a plan, not something built. Full detail, with workstreams, exit criteria and risks: [docs/roadmap.md](docs/roadmap.md).
+
+| Stage | The question it answers | Main work | Done when |
+|---|---|---|---|
+| **POC** (today) | Does the loop from data to decision make sense? | Synthetic data, one process, all four loops sketched | Demo runs end to end |
+| **MVP** | Does one loop help one real team decide better? | One loop (recommended: ride demand and charger sizing) on real data for one city; PostgreSQL; sign-on; scheduled forecasts | Model beats the naive baseline on real held-out data, and a real decision was made with the tool |
+| **Pilot** | Does it run for weeks without the build team watching? | Streaming ingestion, model registry and retraining, service split, SLOs, on-call, backups | Four weeks inside SLO; a model promoted through the pipeline; a restore drill done |
+| **Production** | Can the business depend on it? | Multi-zone scale, governance and privacy review, canary releases, cost controls, the ADAS loop with its own safety validation | A quarter inside SLO; disaster recovery tested; security and privacy reviews passed |
+
+Two things to settle before writing MVP code: access to real trip and charging data, and how location data will be kept private. The POC's model scores carry no weight on real data; the first MVP task is to retrain and re-measure.
+
+## Maintenance framework
+
+How the codebase stays easy to change as it grows. Each practice is listed with what exists today and what to add at MVP and production in [docs/maintenance.md](docs/maintenance.md).
+
+| Area | In place today | Added at MVP | Added for production |
+|---|---|---|---|
+| Ownership | `CODEOWNERS` | Owners per area | Team aliases, service catalogue |
+| Code health | Layering test, `make check`, pull request template | Lint and format in CI, branch protection | Contract tests between services |
+| Testing | Unit, API and architecture tests | Browser smoke tests, data checks | Shadow model evaluation, load tests |
+| Release | CI on every push | Deploy to staging on merge, versioned images, migrations | Canary with automatic rollback, feature flags |
+| Reliability | Health check | Uptime alerts | SLOs, error budget, on-call, blameless postmortems, restore drills |
+| Observability | Access log | Structured logs, request metrics | Dashboards, tracing, burn-rate alerts |
+| Models | Model card, baseline comparison | Registry, scheduled retraining, daily error tracking | Drift alerts, shadow then canary rollout |
+| Data | Typed API responses | Generated types, quality checks, retention | Versioned schemas, audited access |
+| Dependencies and security | Dependabot (monthly, grouped) | Vulnerability scans, secret manager, sign-on | Container scanning, least privilege |
+| Documentation | README, architecture, roadmap, in-app guide | Design docs before significant changes | Runbooks per alert, decision records |
+
 ## Screenshots
 
 | | |
@@ -357,9 +387,9 @@ frontend/
   src/lib/        API client, live store, map layers, types, guide text
 data/             generated SQLite database and CSV/JSON datasets (created on first run)
 scripts/          generate_telemetry.py: dataset generation and telemetry stream
-docs/             architecture, workflows, demo script, business value, screenshots
+docs/             architecture, roadmap, maintenance framework, workflows, demo script, screenshots
 deployment/       optional Kubernetes examples
 start.sh          launcher (Docker or native), EC2-aware
 Makefile          check, test, start, stop
-.github/          CI: tests, typecheck and build on every push
+.github/          CI workflow, CODEOWNERS, pull request template, Dependabot
 ```

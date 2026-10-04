@@ -1,0 +1,7 @@
+# Reviewers requested automatically for each path. Split by area as the team grows.
+*                         @Sherlock2019
+/backend/app/services/    @Sherlock2019
+/backend/app/data/        @Sherlock2019
+/frontend/                @Sherlock2019
+/deployment/              @Sherlock2019
+/start.sh                 @Sherlock2019
