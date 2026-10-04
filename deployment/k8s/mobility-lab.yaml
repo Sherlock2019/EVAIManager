@@ -1,0 +1,132 @@
+# Optional Kubernetes example for the demo (two services, as in docker compose).
+# Not required to run the lab. See README.md in this folder.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mobility-lab
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mobility-lab-config
+  namespace: mobility-lab
+data:
+  DATA_DIR: /data
+  SIM_SEED: "42"
+  SIM_TICK_SECONDS: "3"
+  FLEET_SIZE: "1250"
+  ADAS_FRAME_COUNT: "5000"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mobility-lab-data
+  namespace: mobility-lab
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: mobility-lab
+  labels: { app: backend }
+spec:
+  # The demo keeps simulation state in memory and uses SQLite, so it runs as a
+  # single replica. The production split into stateless services is in
+  # production-topology.yaml.
+  replicas: 1
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: { app: backend }
+  template:
+    metadata:
+      labels: { app: backend }
+    spec:
+      containers:
+        - name: backend
+          image: vinfast-ai-mobility-lab/backend:latest
+          imagePullPolicy: IfNotPresent
+          ports: [{ containerPort: 8000, name: http }]
+          envFrom: [{ configMapRef: { name: mobility-lab-config } }]
+          volumeMounts: [{ name: data, mountPath: /data }]
+          readinessProbe:
+            httpGet: { path: /api/health, port: http }
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /api/health, port: http }
+            initialDelaySeconds: 40
+            periodSeconds: 15
+          resources:
+            requests: { cpu: 250m, memory: 384Mi }
+            limits: { cpu: "1", memory: 1Gi }
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: mobility-lab-data }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend        # the dashboard's nginx proxies /api and /ws to this name
+  namespace: mobility-lab
+spec:
+  selector: { app: backend }
+  ports: [{ port: 8000, targetPort: http, name: http }]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashboard
+  namespace: mobility-lab
+  labels: { app: dashboard }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: dashboard }
+  template:
+    metadata:
+      labels: { app: dashboard }
+    spec:
+      containers:
+        - name: dashboard
+          image: vinfast-ai-mobility-lab/frontend:latest
+          imagePullPolicy: IfNotPresent
+          ports: [{ containerPort: 80, name: http }]
+          readinessProbe:
+            httpGet: { path: /, port: http }
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 50m, memory: 32Mi }
+            limits: { cpu: 250m, memory: 128Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dashboard
+  namespace: mobility-lab
+spec:
+  selector: { app: dashboard }
+  ports: [{ port: 80, targetPort: http, name: http }]
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mobility-lab
+  namespace: mobility-lab
+  annotations:
+    # keep the live-simulation WebSocket open
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: mobility-lab.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: dashboard, port: { number: 80 } }

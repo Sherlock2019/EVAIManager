@@ -1,0 +1,30 @@
+# VinFast AI Mobility Intelligence Lab — synthetic-data demo
+#
+#   docker compose up --build
+#
+# Dashboard: http://localhost:8080      API docs: http://localhost:8000/api/docs
+
+services:
+  backend:
+    build: ./backend
+    environment:
+      DATA_DIR: /data
+      SIM_SEED: ${SIM_SEED:-42}
+      SIM_TICK_SECONDS: ${SIM_TICK_SECONDS:-3}
+      SIM_SECONDS_PER_TICK: ${SIM_SECONDS_PER_TICK:-60}
+      FLEET_SIZE: ${FLEET_SIZE:-1250}
+      ADAS_FRAME_COUNT: ${ADAS_FRAME_COUNT:-5000}
+    volumes:
+      - ./data:/data          # generated SQLite + CSV/JSON datasets persist here
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    restart: unless-stopped

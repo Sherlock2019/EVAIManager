@@ -1,0 +1,20 @@
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# node
+node_modules/
+dist/
+.vite/
+
+# generated at first start (reproducible from the seed)
+data/mobility_lab.db
+data/generated/
+
+# local config
+.env
+
+# start.sh pid files and logs
+.run/

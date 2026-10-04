@@ -1,0 +1,107 @@
+# CONCEPTUAL — not applied by the demo.
+#
+# Sketch of how the lab's service layer would be split for production: one
+# deployment per service, CPU and GPU workloads on separate node pools, each
+# scaled on its own signal. Image names, node labels and numbers are
+# illustrative placeholders.
+#
+#   CPU pool   vehicle-ingestion, fleet-health, maintenance-prediction,
+#              charging-optimizer, route-analysis, human-review, api-gateway, dashboard
+#   GPU pool   adas-label (inference), model training jobs
+#   Storage    object storage: camera, LiDAR, model artifacts
+#              database: fleet, labels, maintenance, charging
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vehicle-ingestion-service
+  namespace: mobility
+spec:
+  replicas: 6                      # scaled on consumer lag (see HPA below)
+  selector:
+    matchLabels: { app: vehicle-ingestion-service }
+  template:
+    metadata:
+      labels: { app: vehicle-ingestion-service, workload: cpu }
+    spec:
+      nodeSelector: { pool: cpu }
+      containers:
+        - name: ingestion
+          image: registry.example.com/mobility/vehicle-ingestion:1.0.0
+          env:
+            - { name: MQTT_BROKER_URL, value: "mqtts://vehicle-gateway.mobility.svc:8883" }
+            - { name: TELEMETRY_TOPIC, value: "fleet/+/telemetry" }
+            - { name: EVENT_STREAM_BOOTSTRAP, value: "kafka.mobility.svc:9092" }
+          resources:
+            requests: { cpu: 500m, memory: 512Mi }
+            limits: { cpu: "2", memory: 1Gi }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: vehicle-ingestion-service
+  namespace: mobility
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: vehicle-ingestion-service }
+  minReplicas: 3
+  maxReplicas: 40
+  metrics:
+    - type: External
+      external:
+        metric: { name: kafka_consumer_lag, selector: { matchLabels: { topic: fleet-telemetry } } }
+        target: { type: AverageValue, averageValue: "5000" }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: adas-label-service
+  namespace: mobility
+spec:
+  replicas: 4
+  selector:
+    matchLabels: { app: adas-label-service }
+  template:
+    metadata:
+      labels: { app: adas-label-service, workload: gpu }
+    spec:
+      nodeSelector: { pool: gpu }
+      tolerations:
+        - { key: nvidia.com/gpu, operator: Exists, effect: NoSchedule }
+      containers:
+        - name: auto-label
+          image: registry.example.com/mobility/adas-label:6.0.0
+          env:
+            - { name: MODEL_URI, value: "s3://model-registry/adas-vision/v6" }
+            - { name: AUTO_ACCEPT_THRESHOLD, value: "0.90" }
+            - { name: HUMAN_REVIEW_THRESHOLD, value: "0.70" }
+          resources:
+            limits: { nvidia.com/gpu: 1, memory: 16Gi }
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: adas-model-training
+  namespace: mobility
+spec:
+  schedule: "0 18 * * 5"           # weekly retrain on the newest dataset version
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          nodeSelector: { pool: gpu-training }
+          containers:
+            - name: train
+              image: registry.example.com/mobility/adas-train:6.0.0
+              args: ["--dataset", "ADAS-v24", "--register", "adas-vision"]
+              resources:
+                limits: { nvidia.com/gpu: 8, memory: 256Gi }
+---
+# The remaining CPU services follow the same shape as vehicle-ingestion-service:
+#   human-review-service            review queue + reviewer console API
+#   fleet-health-service            vehicle digital health profiles
+#   maintenance-prediction-service  risk scoring, reason codes
+#   charging-optimizer-service      site scoring, what-if scenarios
+#   route-analysis-service          trip density, heatmaps
+#   api-gateway                     authn/z, routing, rate limits
+#   dashboard                       static web app

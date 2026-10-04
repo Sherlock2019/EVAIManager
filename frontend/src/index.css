@@ -1,0 +1,186 @@
+@import "@fontsource-variable/inter";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+@import "@fontsource/jetbrains-mono/700.css";
+@import "leaflet/dist/leaflet.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-abyss text-ink font-sans antialiased;
+    font-feature-settings: "cv11", "ss01";
+    font-size: 13px;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #263347 transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #263347;
+    border-radius: 8px;
+  }
+  :focus-visible {
+    outline: 2px solid #3bc9f5;
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* small uppercase instrument label */
+  .label {
+    @apply font-mono text-3xs uppercase tracking-[0.14em] text-ink-3;
+  }
+  .num {
+    @apply font-mono tabular-nums;
+  }
+  .panel {
+    @apply rounded-lg border border-line bg-panel shadow-panel;
+  }
+  .table-grid th {
+    @apply label whitespace-nowrap border-b border-line px-3 py-2 text-left font-normal;
+  }
+  .table-grid td {
+    @apply border-b border-line/70 px-3 py-2 align-middle;
+  }
+  .table-grid tbody tr {
+    @apply transition-colors hover:bg-raised;
+  }
+  .hairline-grid {
+    background-image: linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+}
+
+/* ---- range slider ---- */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 4px;
+  background: linear-gradient(to right, #3bc9f5 var(--fill, 50%), #1c2738 var(--fill, 50%));
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #e8eef7;
+  border: 3px solid #3bc9f5;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #e8eef7;
+  border: 3px solid #3bc9f5;
+}
+
+/* ---- Leaflet, restyled for the dark cockpit ---- */
+.leaflet-container {
+  background: #070b12;
+  font-family: inherit;
+  font-size: 12px;
+}
+/* standard OpenStreetMap raster tiles (VITE_MAP_TILES=osm), recoloured to a dark basemap */
+.tiles-osm .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(185deg) brightness(0.82) contrast(0.95) saturate(0.32);
+}
+.leaflet-control-attribution {
+  background: rgba(5, 8, 13, 0.7) !important;
+  color: #64748b !important;
+  font-size: 9px;
+}
+.leaflet-control-attribution a {
+  color: #a3b2c7 !important;
+}
+.leaflet-bar a {
+  background: #0f1621 !important;
+  color: #a3b2c7 !important;
+  border-color: #263347 !important;
+}
+.leaflet-bar a:hover {
+  background: #18212f !important;
+  color: #e8eef7 !important;
+}
+.leaflet-bar {
+  border: 1px solid #263347 !important;
+  box-shadow: none !important;
+}
+.leaflet-popup-content-wrapper {
+  background: #0f1621;
+  color: #e8eef7;
+  border: 1px solid #263347;
+  border-radius: 8px;
+  box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.8);
+}
+.leaflet-popup-content {
+  margin: 12px 14px;
+  line-height: 1.45;
+}
+.leaflet-popup-tip {
+  background: #0f1621;
+  border: 1px solid #263347;
+}
+.leaflet-popup-close-button {
+  color: #64748b !important;
+}
+.leaflet-tooltip {
+  background: #0f1621;
+  color: #e8eef7;
+  border: 1px solid #263347;
+  box-shadow: none;
+  font-size: 11px;
+}
+.leaflet-tooltip::before {
+  display: none;
+}
+.map-divicon {
+  background: none;
+  border: none;
+}
+.heat-canvas {
+  pointer-events: none;
+}
+
+/* animated dashed flow line used in diagrams */
+@keyframes dashFlow {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+.flow-line {
+  stroke-dasharray: 4 8;
+  animation: dashFlow 1.2s linear infinite;
+}
+/* passenger flows and EV repositioning on the ride demand map: dashes travel origin → destination */
+.ride-flow {
+  stroke-dasharray: 8 4;
+  animation: dashFlow 1.1s linear infinite;
+}
+.ride-move {
+  stroke-dasharray: 7 5;
+  animation: dashFlow 0.8s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ride-flow,
+  .ride-move,
+  .flow-line,
+  .animate-pulse-dot,
+  .animate-slide-in {
+    animation: none !important;
+  }
+}
