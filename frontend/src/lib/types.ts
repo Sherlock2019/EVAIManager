@@ -375,6 +375,48 @@ export interface RideForecast {
   };
 }
 
+export interface ModelScores {
+  mae: number;
+  wape_pct: number;
+  r2: number;
+}
+
+export interface DemandModelCard {
+  name: string;
+  algorithm: string;
+  target: string;
+  trained_on: string;
+  training_rows: number;
+  test_rows: number;
+  test_period: string;
+  note: string;
+  metrics: {
+    model: ModelScores;
+    baseline: ModelScores;
+    baseline_name: string;
+    mae_improvement_pct: number;
+    rain_hours: { model: ModelScores; baseline: ModelScores } | null;
+  };
+  importance: { feature: string; label: string; source: string; share_pct: number; mae_increase: number }[];
+  zones: string[];
+  /** actual / predicted / baseline are [zone][hour of the test week] */
+  test_week: { labels: string[]; rain: number[]; actual: number[][]; predicted: number[][]; baseline: number[][] };
+  pipeline: string[];
+}
+
+export interface DemandPrediction {
+  zone: string;
+  hour: number;
+  day: string;
+  rain: boolean;
+  predicted_pickups: number;
+  dry_pickups: number;
+  rain_pickups: number;
+  rain_effect_pct: number;
+  typical_pickups: number;
+  evs_needed: number;
+}
+
 export interface Detection {
   id: number;
   cls: string;

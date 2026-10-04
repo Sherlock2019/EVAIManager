@@ -54,6 +54,20 @@ def test_ride_forecast_covers_24_hours_and_balances(client):
     assert client.get("/api/rides/forecast", params={"day": "holiday"}).status_code == 422
 
 
+def test_trained_demand_model_beats_the_naive_baseline(client):
+    card = client.get("/api/rides/model").json()
+    m = card["metrics"]
+    assert m["model"]["mae"] < m["baseline"]["mae"] and m["mae_improvement_pct"] > 10
+    assert m["model"]["r2"] > 0.9
+    assert abs(sum(f["share_pct"] for f in card["importance"]) - 100) < 1
+    assert len(card["test_week"]["labels"]) == 168 and len(card["test_week"]["predicted"]) == 14
+    # the model learned from the rows that rain raises demand
+    dry = client.get("/api/rides/model/predict", params={"zone": 0, "hour": 17, "day_of_week": 4}).json()
+    wet = client.get("/api/rides/model/predict", params={"zone": 0, "hour": 17, "day_of_week": 4, "rain": True}).json()
+    assert wet["predicted_pickups"] > dry["predicted_pickups"] > 0
+    assert client.get("/api/rides/model/predict", params={"zone": 99}).status_code == 422
+
+
 def test_human_review_feeds_the_next_dataset(client):
     queue = client.get("/api/adas/review-queue").json()
     frame = queue["items"][0]

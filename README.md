@@ -35,6 +35,12 @@ One fleet, three feedback loops:
 
 ![Ride demand](docs/screenshots/ride-demand.png)
 
+**Demand Forecast Model** is a real trained model: scikit-learn gradient-boosted trees (Poisson loss) fitted on 49 days of synthetic hourly ride history and scored on a held-out week against the naive "same hour last week" forecast. The page shows its error, predicted versus actual per zone, which features it relies on, and a what-if predictor (zone, day, hour, rain). The history is synthetic, so the scores describe how well it recovers the simulated patterns, not real-world accuracy.
+
+![Demand forecast model](docs/screenshots/demand-model.png)
+
+**In-app guide.** The Overview opens with what the app is for, the problems it solves and how to use each main feature. Every other page carries a collapsible bar with the same three things for that page.
+
 The point is the system, not a single model: data creates intelligence, intelligence creates decisions, humans validate the important ones, actions create new data.
 
 ## Architecture
@@ -195,6 +201,8 @@ Interactive documentation: `/api/docs`.
 | GET | `/api/chargers/recommendations` | Planning engine; query params are the what-if sliders |
 | GET | `/api/routes`, `/api/routes/heatmap` | Routes and density layers |
 | GET | `/api/rides/forecast` | 24-hour passenger demand, EV supply, trip flows, driver moves and charger sizing (`day=weekday\|weekend`) |
+| GET | `/api/rides/model` | Trained demand model: scores versus baseline, feature importance, test-week predictions |
+| GET | `/api/rides/model/predict` | What-if forecast for one zone and hour (`zone`, `hour`, `day_of_week`, `rain`) |
 | GET | `/api/adas/frames`, `/api/adas/frames/{id}` | Frames with simulated detections |
 | GET | `/api/adas/pipeline` | Auto-label routing statistics |
 | GET | `/api/adas/review-queue` | Frames awaiting a human |

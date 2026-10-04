@@ -4,6 +4,7 @@ import { ArrowRight, BatteryCharging, Car, Crosshair, Database, MapPin, ScanEye,
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { LOOP } from "../components/AppShell";
+import { AppGuide } from "../components/Guide";
 import { MapOverlay, MapView, useFleetLayer } from "../components/MapView";
 import { Badge, Button, Kpi, Legend, MockTag, Panel } from "../components/ui";
 import { useApi } from "../lib/api";
@@ -164,6 +165,8 @@ export default function Overview() {
         </div>
         <MockTag>Synthetic data · not an official VinFast product</MockTag>
       </div>
+
+      <AppGuide />
 
       {/* KPI row */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 min-[1900px]:grid-cols-8">

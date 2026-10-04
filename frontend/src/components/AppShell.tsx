@@ -3,7 +3,7 @@ import {
   Activity,
   BatteryCharging,
   Bot,
-
+  BrainCircuit,
   Car,
   Crosshair,
   Database,
@@ -27,6 +27,7 @@ import { runDemo, useDemo } from "../lib/demo";
 import { fmtInt } from "../lib/format";
 import { useLive } from "../lib/live";
 import { DemoRunner } from "./DemoRunner";
+import { PageGuide } from "./Guide";
 import { Dot } from "./ui";
 
 interface NavItem {
@@ -70,6 +71,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
       { to: "/energy/charging", label: "Charging Network", icon: BatteryCharging },
       { to: "/energy/routes", label: "Route Intelligence", icon: Route },
       { to: "/energy/demand", label: "Ride Demand 24h", icon: Users },
+      { to: "/energy/model", label: "Demand Forecast Model", icon: BrainCircuit },
     ],
   },
   {
@@ -205,6 +207,7 @@ export function AppShell() {
         <Sidebar />
         <main className={clsx("min-w-0 flex-1 overflow-y-auto transition-[padding] duration-300", demoOpen && "xl:pr-[392px]")}>
           <div className="mx-auto max-w-[1720px] p-4">
+            <PageGuide />
             <Outlet />
           </div>
         </main>

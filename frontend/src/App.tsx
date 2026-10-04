@@ -5,6 +5,7 @@ import Architecture from "./pages/Architecture";
 import ChargingNetwork from "./pages/ChargingNetwork";
 import Copilot from "./pages/Copilot";
 import Datasets from "./pages/Datasets";
+import DemandModel from "./pages/DemandModel";
 import EdgeCases from "./pages/EdgeCases";
 import FleetCommand from "./pages/FleetCommand";
 import HumanReview from "./pages/HumanReview";
@@ -34,6 +35,7 @@ export default function App() {
         <Route path="energy/charging" element={<ChargingNetwork />} />
         <Route path="energy/routes" element={<RouteIntelligence />} />
         <Route path="energy/demand" element={<RideDemand />} />
+        <Route path="energy/model" element={<DemandModel />} />
         <Route path="copilot" element={<Copilot />} />
         <Route path="system/architecture" element={<Architecture />} />
         <Route path="system/simulation" element={<SimulationControls />} />
