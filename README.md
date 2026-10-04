@@ -1,17 +1,68 @@
 # VINFAST AI MOBILITY INTELLIGENCE LAB
 
-Two practical AI concepts demonstrating how vehicle data can become a continuously improving intelligence platform.
-
-**POC 1:** ADAS Human-in-the-Loop Learning Platform
-
-**POC 2:** EV Fleet Health & Charging Intelligence Platform
-
 > **This project is an independent technology demonstration created using synthetic data. It is not an official VinFast product.**
-> No VinFast APIs, telemetry or datasets are used. The "models" are simulations of how such models behave, not production autonomous-driving models.
+> No VinFast APIs, telemetry or datasets are used. Most "models" are transparent rules that simulate how such models behave; the one trained model learns from synthetic history. None are production autonomous-driving models.
+
+## What it is
+
+A working proof of concept of an AI operations platform for an electric-vehicle fleet. One web dashboard, backed by one API, turns the data a fleet produces (cameras, telemetry, GPS, passenger and charging signals) into decisions for the teams that run it.
+
+It runs on a laptop or a single cloud instance with one command, on a seeded synthetic world of 1,250 EVs, 186 charging stations and 5,000 driving frames.
+
+![Executive overview](docs/screenshots/overview.png)
+
+## What it does
+
+Five jobs, each with a concrete goal.
+
+| Job | Goal | How | Page |
+|---|---|---|---|
+| **EV car maintenance management** | Service every at-risk vehicle before it breaks down | Scores battery, motor, tires and brakes on each car, ranks the risky ones with reasons, and books the service | Vehicle Health, Maintenance |
+| **EV charger management** | Keep every station at a healthy load, with no queues and no idle ports | Tracks ports in use, flags overloaded and underused stations, and sizes each one to its busiest hour | Ride Demand 24h, Charging Network |
+| **EV charger planning** | Build new chargers only where demand justifies them | Scores candidate sites, sizes expansions, and marks planned sites that should be cancelled | Charging Network |
+| **Passenger demand and EV positioning** | Have an EV where the next passenger is, at the hour they need it | Forecasts pickups per zone for 24 hours and tells drivers where to be, and when | Ride Demand 24h, Demand Forecast Model |
+| **ADAS data labeling** | Send a person only the labels the AI is unsure about | AI labels every driving frame and scores its confidence; each human correction joins the next training dataset | Labeling Pipeline, Human Review |
+
+Charger management here means load and sizing. Predicting charger hardware faults is not built.
+
+## So what? The benefits
+
+Decisions made earlier, from evidence, with fewer people in the loop.
+
+| Benefit | Because |
+|---|---|
+| Less manual labeling work, and cleaner training data | People review only the low-confidence frames, and their corrections are kept |
+| Fewer breakdowns and less unplanned downtime | Service is booked days before a predicted failure, with the reason stated |
+| Shorter passenger waits and fewer idle EVs | Drivers move to where demand is about to be, not where the last trip ended |
+| Charger money spent where demand is | Sites and port counts come from observed demand, and unneeded plans are flagged |
+| Decisions people can trust | Every score comes with its reasons, and a person confirms the ones that matter |
+
+These are the benefits the design aims at. The demo runs on synthetic data, so it does not measure them.
+
+## For who?
+
+| Who | What they get | Start at |
+|---|---|---|
+| ADAS data teams | A review queue of only the uncertain labels, and the scenarios where the model is weakest | Human Review, Edge Cases |
+| Fleet operations | A ranked list of vehicles to service, with a schedule across service centres | Maintenance |
+| Charging network planners | Sites to add, expand, shrink or cancel, with a what-if simulator | Charging Network |
+| Ride-hailing drivers and dispatch | The zone to be in, and when, for the next 24 hours | Ride Demand 24h |
+| Engineers evaluating the approach | A small, layered, tested codebase with a documented path to production | [Architecture](#architecture), [docs/roadmap.md](docs/roadmap.md) |
+
+## How
+
+The same four steps for every decision:
 
 **Drive → Observe → Learn → Predict → Optimize → Improve**
 
-![Executive overview](docs/screenshots/overview.png)
+1. **Collect.** Cameras, telemetry, GPS, passenger and charging signals from every vehicle (simulated here by a seeded generator and a live tick every 3 seconds).
+2. **Predict.** An engine scores each label, vehicle, zone or station and gives its reasons. Most engines are readable rules; demand forecasting is a trained gradient-boosted model.
+3. **Check.** A person confirms the decisions that matter: a reviewer corrects a label, a planner accepts a site, a manager books a service.
+4. **Act and learn.** The action is taken and written back as data, so the next prediction starts from it.
+
+Technically: a React dashboard talks to a FastAPI service whose engines are plain, tested functions over one in-memory world persisted to SQLite. See [Architecture](#architecture) for the layers and [Technology](#technology) for the stack.
+
+To see it working, run `./start.sh`, open the dashboard and press **RUN AI DEMO**. The Overview page repeats this section and shows how to use each feature.
 
 ---
 
