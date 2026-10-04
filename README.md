@@ -293,7 +293,7 @@ No GPU, no external LLM and no API keys are required.
 ./start.sh stop
 ```
 
-Both services listen on `0.0.0.0` and the script prints the URLs with the machine's public IP. On EC2, allow inbound TCP 9063 in the security group, then open `http://<public-ip>:9063`. Port 8000 is only needed for the API docs. The services keep running after you log out of SSH; logs are in `.run/`.
+Both services listen on `0.0.0.0` and the script prints the URLs with the machine's public IP. On EC2, allow inbound TCP 9063 in the security group, then open `http://<public-ip>:9063`. Port 8000 is only needed for the API docs. If a port is already taken by something else on the machine, the launcher uses the next free one and prints it; the dashboard reaches the API through its own proxy, so only the dashboard port has to be open. The services keep running after you log out of SSH; logs are in `.run/`.
 
 ### Docker (one command)
 

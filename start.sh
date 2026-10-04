@@ -9,7 +9,8 @@
 #
 # Both services listen on 0.0.0.0, so on an AWS EC2 instance the dashboard is
 # reachable at http://<public-ip>:9063 once the security group allows inbound
-# TCP on that port. Ports come from .env (FRONTEND_PORT, BACKEND_PORT).
+# TCP on that port. Ports come from .env (FRONTEND_PORT, BACKEND_PORT); if one
+# is already taken, the next free port is used and printed.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -27,6 +28,7 @@ export FRONTEND_PORT BACKEND_PORT
 
 RUN_DIR="$ROOT/.run"
 MODE_FILE="$RUN_DIR/mode"
+PORTS_FILE="$RUN_DIR/ports"
 # native services get their own session, so they keep running after the SSH session that started them ends
 DETACH="nohup"
 command -v setsid >/dev/null 2>&1 && DETACH="setsid nohup"
@@ -60,10 +62,50 @@ wait_for() { # url, seconds
   done
 }
 
+in_use() {
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltn 2>/dev/null | grep -qE "[:.]$1[[:space:]]"
+  else
+    (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null
+  fi
+}
+
 # free unless something other than our own compose stack is listening on it
 port_free() {
   docker compose ps --format '{{.Ports}}' 2>/dev/null | grep -q ":$1->" && return 0
-  ! (ss -ltn 2>/dev/null | grep -qE "[:.]$1[[:space:]]")
+  ! in_use "$1"
+}
+
+# first free port at or above $1, skipping $2
+next_free_port() {
+  local port="$1" tries=0
+  while ! port_free "$port" || [[ "$port" == "${2:-}" ]]; do
+    port=$((port + 1))
+    tries=$((tries + 1))
+    ((tries < 200)) || die "No free port found between $1 and $port."
+  done
+  echo "$port"
+}
+
+# Use the configured ports if they are free, otherwise the next free ones, and
+# remember the choice so `status` and `stop` report the same URLs.
+resolve_ports() {
+  local want_backend="$BACKEND_PORT" want_frontend="$FRONTEND_PORT"
+  BACKEND_PORT="$(next_free_port "$want_backend")"
+  FRONTEND_PORT="$(next_free_port "$want_frontend" "$BACKEND_PORT")"
+  [[ "$BACKEND_PORT" == "$want_backend" ]] || say "Port $want_backend is in use; the API will use $BACKEND_PORT."
+  [[ "$FRONTEND_PORT" == "$want_frontend" ]] || say "Port $want_frontend is in use; the dashboard will use $FRONTEND_PORT."
+  export FRONTEND_PORT BACKEND_PORT
+  mkdir -p "$RUN_DIR"
+  printf 'FRONTEND_PORT=%s\nBACKEND_PORT=%s\n' "$FRONTEND_PORT" "$BACKEND_PORT" > "$PORTS_FILE"
+}
+
+# ports chosen by the last start, for commands that act on what is already running
+load_saved_ports() {
+  [[ -f "$PORTS_FILE" ]] || return 0
+  # shellcheck disable=SC1090
+  . "$PORTS_FILE"
+  export FRONTEND_PORT BACKEND_PORT
 }
 
 alive() { [[ -f "$RUN_DIR/$1.pid" ]] && kill -0 "$(cat "$RUN_DIR/$1.pid")" 2>/dev/null; }
@@ -87,8 +129,7 @@ EOF
 start_docker() {
   docker_usable || die "Docker is not usable here (is the daemon running, and is this user in the docker group?). Try: ./start.sh native"
   stop_native quiet   # a native run left over would hold the same ports
-  port_free "$BACKEND_PORT" || die "Port $BACKEND_PORT is already in use. Set BACKEND_PORT in .env to a free port."
-  port_free "$FRONTEND_PORT" || die "Port $FRONTEND_PORT is already in use. Set FRONTEND_PORT in .env to a free port."
+  resolve_ports
   say "Building and starting containers…"
   mkdir -p "$RUN_DIR" && echo docker > "$MODE_FILE"
   docker compose up --build -d
@@ -104,6 +145,7 @@ start_native() {
   (( $(node -p 'process.versions.node.split(".")[0]') >= 20 )) || die "Node.js 20+ is required (found $(node -v))."
   mkdir -p "$RUN_DIR"
   stop_native quiet
+  resolve_ports
 
   if [[ ! -x backend/.venv/bin/uvicorn ]]; then
     say "Creating the Python environment…"
@@ -159,7 +201,7 @@ stop_all() {
   if [[ -f "$MODE_FILE" && "$(cat "$MODE_FILE")" == docker ]] && docker_usable; then
     docker compose down
   fi
-  rm -f "$MODE_FILE"
+  rm -f "$MODE_FILE" "$PORTS_FILE"
   say "Stopped."
 }
 
@@ -186,7 +228,7 @@ case "${1:-auto}" in
   auto) if docker_usable; then start_docker; else start_native; fi ;;
   docker) start_docker ;;
   native) start_native ;;
-  stop) stop_all ;;
-  status) status ;;
+  stop) load_saved_ports; stop_all ;;
+  status) load_saved_ports; status ;;
   *) die "usage: ./start.sh [docker|native|stop|status]" ;;
 esac
