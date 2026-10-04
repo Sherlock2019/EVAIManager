@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from typing import Any
 
-from app.data import database, geo
+from app.data import geo
 from app.data.generator import VN_TZ
 from app.data.repository import Repository
 
@@ -98,6 +98,5 @@ def book(repo: Repository, vehicle_id: str) -> dict[str, Any]:
         "scheduled_for": (date.today() + timedelta(days=max(1, days - 1))).isoformat(),
         "created_at": datetime.now(VN_TZ).isoformat(timespec="seconds"),
     }
-    repo.bookings.append(booking)
-    database.insert_booking(booking)
+    repo.add_booking(booking)
     return booking

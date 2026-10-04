@@ -93,6 +93,24 @@ class Repository:
     def dataset(self, version: str) -> dict[str, Any]:
         return next(d for d in self.datasets if d["version"] == version)
 
+    # -- writes that must survive a restart ----------------------------------
+    # Services mutate the in-memory world and call these; nothing outside
+    # app/data talks to SQLite.
+    def save_frame(self, frame: dict[str, Any]) -> None:
+        database.update_frame(frame)
+
+    def add_review(self, review: dict[str, Any], persist: bool = True) -> None:
+        self.reviews.append(review)
+        if persist:
+            database.insert_review(review["frame_id"], review["action"], review["reviewer"], review["detail"], review["created_at"])
+
+    def save_datasets(self) -> None:
+        database.save_document("datasets", self.datasets)
+
+    def add_booking(self, booking: dict[str, Any]) -> None:
+        self.bookings.append(booking)
+        database.insert_booking(booking)
+
 
 def normalize_vehicle_id(raw: str) -> str:
     """Accept 'VF-EV-0821', 'VF-0821' or '821'."""

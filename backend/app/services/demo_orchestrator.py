@@ -10,7 +10,6 @@ from __future__ import annotations
 import copy
 from typing import Any
 
-from app.data import database
 from app.data.generator import DEMO_FRAME_ID, DEMO_VEHICLE_ID
 from app.data.repository import Repository, display_status
 from app.schemas.adas import Correction, ReviewRequest
@@ -57,7 +56,7 @@ def _reset(repo: Repository) -> None:
         _pristine_frame = copy.deepcopy(frame)
     frame.update(copy.deepcopy(_pristine_frame))
     frame.update(label_status="pending_review", review_required=True, dataset_version=None)
-    database.update_frame(frame)
+    repo.save_frame(frame)
 
     _station(repo)["forecast_90d_pct"] = BASE_FORECAST
     route = repo.routes[DEMO_ROUTE_INDEX]

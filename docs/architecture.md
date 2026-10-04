@@ -27,7 +27,8 @@ The loop closes from layer 7 back to layer 3: a reviewer's correction, a booked 
 ```
 ┌──────────────────────────── browser ────────────────────────────┐
 │ React + TypeScript · Tailwind · Leaflet · Recharts · Zustand    │
-│  pages/        15 screens                                       │
+│  pages/        17 screens                                       │
+│  lib/guide.ts  purpose / problem / how-to text for every page   │
 │  lib/live.ts   WebSocket client (polling fallback) → store      │
 │  lib/map.ts    vehicle layer (canvas + clustering), heat layer  │
 └───────────────┬─────────────────────────────────────────────────┘
@@ -35,11 +36,12 @@ The loop closes from layer 7 back to layer 3: a reviewer's correction, a booked 
 ┌───────────────▼─────────────────────────────────────────────────┐
 │ FastAPI                                                         │
 │  routers/    dashboard · vehicles · maintenance · chargers ·    │
-│              routes · adas · datasets · system                  │
+│              routes · rides · adas · datasets · system          │
 │  services/   adas_label_engine     edge_case_engine             │
 │              review_service        model_metrics                │
 │              maintenance_engine    service_scheduler            │
 │              charger_optimizer     route_analyzer               │
+│              ride_demand           demand_model                 │
 │              telemetry_service     dashboard_service            │
 │              copilot               demo_orchestrator            │
 │  schemas/    Pydantic request / response models                 │
@@ -52,6 +54,7 @@ The loop closes from layer 7 back to layer 3: a reviewer's correction, a booked 
 
 - **Routers** only translate HTTP to service calls. No business logic.
 - **Services** contain every decision rule and are plain functions over plain dictionaries, which is why they are easy to unit-test (`backend/tests/test_engines.py`).
+- These rules are enforced by `backend/tests/test_architecture.py`. The README has the full layer table, the recipe for adding a feature and the scaling path.
 - **Repository** is the only module that touches storage. It loads the world into memory at start-up; mutations that must survive a restart (reviews, bookings, dataset counts) are written through to SQLite.
 
 ### Live data path

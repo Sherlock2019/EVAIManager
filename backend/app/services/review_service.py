@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from app.data import database
 from app.data.generator import VN_TZ
 from app.data.repository import Repository
 from app.schemas.adas import ReviewRequest
@@ -71,11 +70,10 @@ def apply_review(repo: Repository, frame: dict[str, Any], req: ReviewRequest, pe
     created = datetime.now(VN_TZ).isoformat(timespec="seconds")
     review = {"frame_id": frame["frame_id"], "action": req.action, "reviewer": req.reviewer, "created_at": created,
               "detail": {"corrections": corrected}}
-    repo.reviews.append(review)
+    repo.add_review(review, persist)
     if persist:
-        database.update_frame(frame)
-        database.insert_review(frame["frame_id"], req.action, req.reviewer, review["detail"], created)
-        database.save_document("datasets", repo.datasets)
+        repo.save_frame(frame)
+        repo.save_datasets()
 
     return {
         "frame": frame, "headline": headline, "message": message,

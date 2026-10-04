@@ -65,21 +65,118 @@ The point is the system, not a single model: data creates intelligence, intellig
                     BETTER EV ECOSYSTEM
 ```
 
-What actually runs in this repository:
+The diagram above is the concept. The rest of this section is what actually runs.
 
-```
- Browser ──HTTP/WebSocket──▶ nginx (dashboard) ──/api, /ws──▶ FastAPI
- React + TS + Tailwind                                         │
- Leaflet · Recharts                       routers ─▶ services ─▶ repository ─▶ SQLite
-                                                       │                        + CSV/JSON
-                                    live simulation tick (every 3 s)
+### Goals and non-goals
+
+| Goals | Non-goals |
+|---|---|
+| Show the full loop from vehicle data to a decision, end to end, on one laptop | Production scale, security hardening or multi-tenant use |
+| Keep every decision rule readable and unit-tested | Real perception models or real VinFast data |
+| Make each engine separable, so it can become its own service later | High availability; the demo is one process with in-memory state |
+| Same seed, same world, same numbers on every run | Tuned model accuracy on real-world data |
+
+### System
+
+```mermaid
+flowchart LR
+  subgraph Browser
+    UI["React dashboard<br/>17 pages · Leaflet · Recharts"]
+  end
+  subgraph Edge["nginx (Docker) or vite preview (native) · :9063"]
+    Proxy["static files<br/>/api and /ws proxy"]
+  end
+  subgraph API["FastAPI · :8000 · one process"]
+    Routers["routers/<br/>HTTP only"]
+    Services["services/<br/>all decision logic"]
+    Sim["LiveSimulation<br/>tick every 3 s"]
+    Repo["data/repository<br/>in-memory world"]
+  end
+  DB[("SQLite<br/>+ CSV/JSON exports")]
+  UI -- "REST /api" --> Proxy
+  UI -- "WebSocket /ws/live" --> Proxy
+  Proxy --> Routers
+  Routers --> Services
+  Services --> Repo
+  Sim --> Repo
+  Sim -- "deltas" --> Routers
+  Repo --> DB
 ```
 
-- **Routers** (`backend/app/routers`) are thin HTTP handlers.
-- **Services** (`backend/app/services`) hold all logic: auto-label engine, edge-case miner, maintenance engine, charger optimizer, route analyzer, service scheduler, live simulator, copilot.
-- **Repository** (`backend/app/data`) is the only data-access layer: generates the synthetic world, persists it to SQLite, exports CSV/JSON.
+### Layers and the rules between them
+
+| Layer | Path | Owns | Must not |
+|---|---|---|---|
+| Pages | `frontend/src/pages` | One screen each; local UI state | Call `fetch` directly, or share state except through `lib/` |
+| Frontend library | `frontend/src/lib` | API client (`api.ts`), live store (`live.ts`), map layers (`map.ts`), payload types (`types.ts`), guide text (`guide.ts`) | Contain page-specific layout |
+| Routers | `backend/app/routers` | URL, parameter validation, status codes | Contain business logic |
+| Services | `backend/app/services` | Every decision rule, as plain functions over plain data | Import FastAPI, or read or write storage directly |
+| Repository | `backend/app/data` | The world state, persistence, the synthetic generator | Make decisions |
+
+Dependencies point one way: pages → lib → routers → services → repository. A service never imports a router, and nothing outside `app/data` touches SQLite. This is what makes each engine testable without a server and movable into its own process later. The one exception is `telemetry_service`, which imports FastAPI's `WebSocket` type because it holds the connected clients. `backend/tests/test_architecture.py` fails the build if any other module breaks these rules.
+
+### Engines
+
+Each file in `backend/app/services` is one engine with explicit inputs and outputs.
+
+| Engine | What it decides | API | Page |
+|---|---|---|---|
+| `adas_label_engine` | Confidence per label; accept, spot-check or human review | `/api/adas/frames`, `/pipeline` | Labeling Pipeline |
+| `review_service` | Applies a human correction and adds it to the next dataset | `/api/adas/review/{id}` | Human Review |
+| `edge_case_engine` | Which scenarios the model is likely to get wrong | `/api/adas/edge-cases` | Edge Cases |
+| `model_metrics` | Model comparison (mock numbers) | `/api/adas/model-metrics` | Model Metrics |
+| `maintenance_engine` | Risk score, predicted component, reason codes; IsolationForest anomaly score | `/api/maintenance/predictions` | Vehicle Health, Maintenance |
+| `service_scheduler` | Groups vehicles into a service plan | `/api/maintenance/optimize-schedule` | Maintenance |
+| `charger_optimizer` | Add, expand or do not build | `/api/chargers/recommendations` | Charging Network |
+| `route_analyzer` | Trips, replay samples, heatmaps | `/api/routes`, `/api/vehicles/{id}/route` | Route Intelligence |
+| `ride_demand` | 24-hour passengers, EV supply, trip flows, driver moves, charger sizing | `/api/rides/forecast` | Ride Demand 24h |
+| `demand_model` | Trained gradient-boosted forecast of pickups per zone-hour | `/api/rides/model`, `/predict` | Demand Forecast Model |
+| `telemetry_service` | The live simulation tick and its WebSocket deltas | `/ws/live`, `/api/sim/*` | Fleet Command, Simulation Controls |
+| `copilot` | Keyword intent, answered from the engines above | `/api/copilot/ask` | AI Recommendations |
+| `demo_orchestrator` | The 11 guided-demo steps, each a real state change | `/api/demo/step/{n}` | RUN AI DEMO |
+
+### Request path and live path
+
+- **Read:** a page calls `useApi("/api/…")` → router validates parameters → service computes from the repository's in-memory world → JSON.
+- **Write:** reviews, bookings and dataset counts go through the repository, which updates memory and writes through to SQLite, then the frontend bumps a refresh key so open pages refetch.
+- **Live:** `LiveSimulation.tick()` advances the world every 3 s and broadcasts a compact delta (`[index, lat, lon, soc, status, speed]` per moved vehicle) over `/ws/live`. The browser falls back to polling `/api/live/tick` if the socket drops.
 
 More detail: [docs/architecture.md](docs/architecture.md) · [docs/adas-workflow.md](docs/adas-workflow.md) · [docs/fleet-ai-workflow.md](docs/fleet-ai-workflow.md)
+
+## Extending the POC
+
+Adding a feature touches the same six places every time. Ride Demand 24h was added exactly this way.
+
+1. **Engine:** add `backend/app/services/<name>.py`. Pure functions, constants named at the top, the formula in the module docstring.
+2. **Route:** add or extend a file in `backend/app/routers` and register new routers in `backend/app/main.py`. Validate inputs with types (`Literal`, `Query(ge=, le=)`), so bad input returns 422 without custom code.
+3. **Tests:** rules in `backend/tests/test_engines.py`, the HTTP contract in `backend/tests/test_api.py`.
+4. **Types:** mirror the response in `frontend/src/lib/types.ts`.
+5. **Page:** add `frontend/src/pages/<Name>.tsx` from the shared pieces in `components/ui.tsx` and `components/MapView.tsx`; add the route in `App.tsx` and the nav entry in `components/AppShell.tsx`.
+6. **Guide:** add the page's purpose, problem and steps to `frontend/src/lib/guide.ts`. The bar at the top of the page and the Overview card come from that entry.
+
+Conventions that keep it maintainable:
+
+- **Configuration** comes from environment variables read in one place, `backend/app/config.py`. Nothing else calls `os.getenv`.
+- **Tunable numbers** are module-level constants with a comment saying what they mean, never literals inside a function.
+- **Honesty labels:** anything simulated or mock says so in the API response (`note`) and on the page (`MockTag`).
+- **Determinism:** all randomness is seeded from `SIM_SEED`, so tests can assert exact names and counts.
+- **One command checks everything:** `make check` runs the backend tests, the frontend typecheck and the production build. CI runs the same on every push ([.github/workflows/ci.yml](.github/workflows/ci.yml)).
+
+## Scaling path
+
+The demo is one process holding the world in memory. That is the right size for a POC and the wrong size for a fleet. This is the order things would break, and what replaces them. None of it is built here.
+
+| Pressure | What breaks first | Change | Why it is a contained change |
+|---|---|---|---|
+| More API traffic | One uvicorn process | Run several workers behind a load balancer | Only after state moves out of process memory (next row) |
+| More than one process | In-memory world in `Repository` | Back the repository with PostgreSQL (+ PostGIS for zones and routes) and Redis for hot state | Services only talk to the repository interface, so they do not change |
+| Real vehicles | The 3-second simulation tick | Vehicle gateway → MQTT/Kafka → stream processor writing to a time-series store | `telemetry_service` is the only producer of position deltas |
+| Many dashboard users | Per-process WebSocket broadcast | Pub/sub fan-out (Redis or NATS) behind the socket servers | The delta format already is the message |
+| Heavy model work | Training and forecasting inside request handlers | Offline training jobs, a model registry, forecasts written to a table and served from cache | `demand_model` already separates `train` from `predict` |
+| Team growth | One backend deployable | One service per engine on Kubernetes, CPU and GPU node pools | Each engine is already a module with explicit inputs and outputs; see [deployment/k8s/production-topology.yaml](deployment/k8s/production-topology.yaml) |
+| Larger frontend | One JavaScript bundle of about 1 MB | Route-level code splitting with `React.lazy` | Each page is already a separate default export |
+
+The component-by-component version of this is in [Future production architecture](#future-production-architecture).
 
 ## Screenshots
 
@@ -150,6 +247,7 @@ Open <http://localhost:5173>.
 ### Tests and tools
 
 ```bash
+make check                                                           # everything CI runs: tests, typecheck, build
 cd backend && pip install -r requirements-dev.txt && pytest          # engine + API tests
 cd frontend && npm run build                                         # typecheck + production build
 python scripts/generate_telemetry.py --stream --ticks 5              # print telemetry events as JSON lines
@@ -247,10 +345,21 @@ Kubernetes examples: [deployment/k8s](deployment/k8s).
 ## Repository layout
 
 ```
-backend/     FastAPI app: routers, services, schemas, data layer, tests
-frontend/    React dashboard: pages, components, map and live-data libraries
-data/        Generated SQLite database and CSV/JSON datasets (created on first run)
-scripts/     generate_telemetry.py — dataset generation and telemetry stream
-docs/        Architecture, workflows, demo script, business value, screenshots
-deployment/  Optional Kubernetes examples
+backend/
+  app/routers/    HTTP handlers, one file per API area
+  app/services/   one engine per file: all decision logic
+  app/data/       repository (world state), SQLite persistence, synthetic generator
+  app/schemas/    Pydantic response models
+  tests/          test_engines.py (rules) · test_api.py (HTTP contract) · test_architecture.py (layering)
+frontend/
+  src/pages/      one screen per file
+  src/components/ shared UI, map container, app shell, guide
+  src/lib/        API client, live store, map layers, types, guide text
+data/             generated SQLite database and CSV/JSON datasets (created on first run)
+scripts/          generate_telemetry.py: dataset generation and telemetry stream
+docs/             architecture, workflows, demo script, business value, screenshots
+deployment/       optional Kubernetes examples
+start.sh          launcher (Docker or native), EC2-aware
+Makefile          check, test, start, stop
+.github/          CI: tests, typecheck and build on every push
 ```
