@@ -6,7 +6,7 @@ import { MapOverlay, MapView } from "../../components/MapView";
 import { Badge, Button, Legend, Meter, Panel, Stat, Tabs } from "../../components/ui";
 import { useApi } from "../../lib/api";
 import { C, CHARGER_STATUS, toneColor } from "../../lib/format";
-import { CITY_VIEWS, chargerIcon, pilotIcon } from "../../lib/map";
+import { CITY_VIEWS, pilotIcon, vinfastStationIcon } from "../../lib/map";
 import { ACTION_TONE, GROUPS, GROUP_COLOR, GROUP_LABEL, fmtRoi, fmtVnd, fmtWait, fmtYears, type Assumptions, type ByGroup, type Evaluation, type Group, type OcTab, type Site, useOc } from "../../lib/openCharging";
 import { pickPilot, pilotPopup, pilotTeslaPorts, popupRow } from "../../lib/pilot";
 import type { Charger } from "../../lib/types";
@@ -348,7 +348,7 @@ export default function Investment({ ev, goto }: { ev: Evaluation; goto: (t: OcT
     for (const c of stations) {
       const rank = pilotRank.get(c.station_id);
       const opp = opportunityIds.has(c.station_id);
-      L.marker([c.latitude, c.longitude], { icon: rank ? pilotIcon(rank) : opp ? teslaOpportunityIcon() : chargerIcon(c.status, { size: 14 }), zIndexOffset: rank ? 700 : opp ? 600 : 0 })
+      L.marker([c.latitude, c.longitude], { icon: rank ? pilotIcon(rank) : opp ? teslaOpportunityIcon() : vinfastStationIcon(c.status), zIndexOffset: rank ? 700 : opp ? 600 : 0 })
         .bindTooltip(`${c.name}${rank ? ` · hybrid pilot #${rank}` : opp ? " · VinFast-only, Tesla opportunity (underused)" : " · VinFast-only"} · ${Math.round(c.utilization * 100)}% util. · ${c.avg_daily_sessions} sessions/day`, { direction: "top", offset: [0, -10] })
         .bindPopup(rank ? pilotPopup(c, rank) : networkPopup(c))
         .addTo(group);
@@ -433,12 +433,12 @@ export default function Investment({ ev, goto }: { ev: Evaluation; goto: (t: OcT
                   <img src="/brands/tesla.png" alt="" width={11} height={11} className="rounded-full ring-1 ring-[#E31937]" />
                   Tesla opportunity (underused)
                 </span>
-                <span className="flex items-center gap-1 text-ink-2">
-                  <img src="/brands/vinfast.png" alt="" width={11} height={11} className="rounded-sm" />
-                  VinFast-only stations, colour = load:
-                </span>
+                <span className="text-ink-2">VinFast-only stations, ring = load:</span>
                 {["normal", "high", "overloaded", "low"].map((k) => (
-                  <span key={k} className="flex items-center gap-1"><span className="h-2 w-2 rounded-sm" style={{ background: CHARGER_STATUS[k].color }} />{CHARGER_STATUS[k].label}</span>
+                  <span key={k} className="flex items-center gap-1">
+                    <img src="/brands/vinfast.png" alt="" width={11} height={11} className="rounded-full" style={{ boxShadow: `0 0 0 2px ${CHARGER_STATUS[k].color}` }} />
+                    {CHARGER_STATUS[k].label}
+                  </span>
                 ))}
               </div>
             </MapOverlay>

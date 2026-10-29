@@ -387,6 +387,17 @@ export function gridNodeIcon(loading: number, status: string): L.DivIcon {
   });
 }
 
+/** VinFast-only network station: the VinFast mark with a ring coloured by load status. */
+export function vinfastStationIcon(status: string, size = 14): L.DivIcon {
+  const color = CHARGER_STATUS[status]?.color ?? C.idle;
+  return L.divIcon({
+    className: "map-divicon",
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    html: `<div style="width:${size}px;height:${size}px;border-radius:50%;overflow:hidden;box-shadow:0 0 0 1px #05080D,0 0 0 3px ${color}"><img src="/brands/vinfast.png" alt="" style="display:block;width:${size}px;height:${size}px;max-width:none"/></div>`,
+  });
+}
+
 /** Proposed hybrid VinFast + Tesla pilot station: both brand marks side by side (simulation only). */
 export function pilotIcon(rank: number, highlight = false): L.DivIcon {
   const s = highlight ? 18 : 16;
