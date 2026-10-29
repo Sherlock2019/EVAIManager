@@ -387,6 +387,9 @@ Interactive documentation: `/api/docs`.
 | POST | `/api/maintenance/schedule/{id}` | Book service for a vehicle |
 | GET | `/api/chargers` | Stations with availability and recommendation |
 | GET | `/api/chargers/recommendations` | Planning engine; query params are the what-if sliders |
+| GET | `/api/chargers/grid` | Synthetic grid nodes: EV hosting capacity vs station peak need |
+| GET | `/api/chargers/observed` | **Real** station locations from OpenStreetMap (+ Open Charge Map with `OCM_API_KEY`), observed data only |
+| POST | `/api/chargers/observed/refresh` | Re-fetch the real stations and cache them in `DATA_DIR`; keeps the previous data if the sources fail |
 | GET | `/api/open-charging/meta` | Default assumptions, weights, queue policy, formulas, disclaimer |
 | POST | `/api/open-charging/evaluate` | Scores, waits, revenue A/B/C, ROI options and recommendation for every synthetic site |
 | POST | `/api/open-charging/queue/simulate` | Priority queue simulation with snapshots, ETAs, stats and alerts |
@@ -428,7 +431,8 @@ Kubernetes examples: [deployment/k8s](deployment/k8s).
 
 ## Limitations
 
-- **Everything is synthetic.** Vehicles, telemetry, stations, routes, frames, metrics and monetary values are generated from a seed. Dollar figures are illustrative mock estimates.
+- **Everything is synthetic, except the "Real stations" layer.** Vehicles, telemetry, stations, routes, frames, metrics and monetary values are generated from a seed. Dollar figures are illustrative mock estimates.
+- **Real stations are locations only.** The white-ring markers come from OpenStreetMap (© OpenStreetMap contributors, ODbL) and, with a free `OCM_API_KEY`, Open Charge Map. They carry no live status, price or usage. A snapshot (October 2026, 468 stations) ships in `backend/app/data/observed_snapshot.json` so the demo works offline. Open-data coverage is uneven: most mapped stations are in Hanoi, few in HCMC.
 - **No real perception.** The auto-label engine assigns confidences by rule; camera frames are drawn scenes, not images. Model metrics are authored numbers, and the "next candidate" uplift is a mock constant per correction.
 - **Edge-case error rates are derived from confidence**, not from audited ground truth.
 - **Routes are not snapped to roads.** They are smoothed lines between district centres, and vehicles can appear to drive through buildings or water.

@@ -10,6 +10,7 @@ import { useDemo } from "../lib/demo";
 import { C, CHARGER_STATUS, fmtInt, fmtUsd, titleCase } from "../lib/format";
 import { useLive } from "../lib/live";
 import { CITY_VIEWS, GRID_STATUS, HeatLayer, chargerIcon, gridNodeIcon, pilotIcon, plannedIcon, siteIcon } from "../lib/map";
+import { type ObservedView, observedIcon, observedPopup } from "../lib/observed";
 import { PILOT_STATIONS, pickPilot, pilotPopup, pilotTeslaPorts } from "../lib/pilot";
 import type { Charger, GridNode, GridView, Plan, Scenario } from "../lib/types";
 
@@ -97,6 +98,8 @@ export default function ChargingNetwork() {
   const [focus, setFocus] = useState<string | null>(null);
   const [showPilot, setShowPilot] = useState(true);
   const [showGrid, setShowGrid] = useState(false);
+  const [showReal, setShowReal] = useState(true);
+  const real = useApi<ObservedView>("/api/chargers/observed");
   const grid = useApi<GridView>(showGrid ? "/api/chargers/grid" : null);
   const gridRef = useRef<GridView | null>(null);
   gridRef.current = showGrid ? grid.data : null;
@@ -170,6 +173,20 @@ export default function ChargingNetwork() {
     group.addTo(map);
     return () => void group.remove();
   }, [map, showGrid, grid.data, chargers.data]);
+
+  // observed (real) stations from open data, drawn above the synthetic network
+  useEffect(() => {
+    if (!map || !showReal || !real.data) return;
+    const group = L.layerGroup();
+    for (const s of real.data.stations) {
+      L.marker([s.latitude, s.longitude], { icon: observedIcon(s), zIndexOffset: 1100 })
+        .bindTooltip(`Real station (observed): ${s.name}`, { direction: "top", offset: [0, -8] })
+        .bindPopup(observedPopup(s, real.data.attribution))
+        .addTo(group);
+    }
+    group.addTo(map);
+    return () => void group.remove();
+  }, [map, showReal, real.data]);
 
   // proposed hybrid VinFast + Tesla pilot stations
   useEffect(() => {
@@ -293,6 +310,17 @@ export default function ChargingNetwork() {
               >
                 <Zap size={11} fill={showGrid ? "currentColor" : "none"} /> Power grid
               </button>
+              <button
+                onClick={() => setShowReal((v) => !v)}
+                aria-pressed={showReal}
+                title="Real charging-station locations from OpenStreetMap (observed open data)"
+                className={clsx(
+                  "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-2xs font-semibold transition-colors",
+                  showReal ? "bg-ink text-abyss shadow-[0_0_12px_#FFFFFF55]" : "border border-ink/50 bg-ink/5 text-ink hover:bg-ink/10",
+                )}
+              >
+                <span className="h-2.5 w-2.5 rounded-full ring-2 ring-current" /> Real stations{real.data ? ` (${real.data.counts.total})` : ""}
+              </button>
             </MapOverlay>
             <MapOverlay position="tr" className={clsx("p-1", demoOpen && "hidden")}>
               <div className="flex gap-0.5">
@@ -305,8 +333,17 @@ export default function ChargingNetwork() {
             </MapOverlay>
             <MapOverlay position="bl" className="px-3 py-2">
               <div className="mb-1 flex items-center gap-1.5 text-2xs text-ink-2">
-                <img src="/brands/vinfast.png" alt="" width={11} height={11} className="rounded-sm" /> VinFast-only stations · colour = load
+                <img src="/brands/vinfast.png" alt="" width={11} height={11} className="rounded-sm" /> VinFast-only stations (synthetic) · colour = load
               </div>
+              {showReal && real.data && (
+                <div className="mb-1 flex max-w-[520px] flex-wrap items-center gap-x-2 text-2xs text-ink-2">
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#6B7A90] ring-2 ring-white" />
+                  <span>
+                    <b className="text-ink">Real stations (observed)</b> · {real.data.counts.vinfast} VinFast · {real.data.counts.other} other · {real.data.counts.unknown} untagged ·
+                    {" "}{real.data.attribution}{real.data.fetched_at ? ` · ${real.data.fetched_at.slice(0, 10)}` : ""} · open-data coverage is incomplete
+                  </span>
+                </div>
+              )}
               <Legend
                 items={[
                   ...["normal", "high", "overloaded", "low"].map((k) => ({ label: CHARGER_STATUS[k].label, color: CHARGER_STATUS[k].color, shape: "square" as const })),

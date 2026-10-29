@@ -11,7 +11,7 @@ import logging
 from typing import Any
 
 from app import config
-from app.data import database, generator
+from app.data import database, generator, observed
 from app.services import maintenance_engine
 
 log = logging.getLogger("mobility.repo")
@@ -33,6 +33,7 @@ class Repository:
         self.bookings: list[dict[str, Any]] = []
         self.reviews: list[dict[str, Any]] = []
         self.open_charging_scenarios: list[dict[str, Any]] = []
+        self._observed: dict[str, Any] | None = None
         self.anomaly_model = maintenance_engine.AnomalyModel()
         self._pristine: dict[str, dict[str, Any]] = {}
 
@@ -113,6 +114,22 @@ class Repository:
     def add_booking(self, booking: dict[str, Any]) -> None:
         self.bookings.append(booking)
         database.insert_booking(booking)
+
+    # -- observed (real) charging stations: raw open-data records, loaded lazily ------------
+    def observed_raw(self) -> dict[str, Any]:
+        if self._observed is None:
+            self._observed = observed.load()
+        return self._observed
+
+    def refresh_observed(self) -> dict[str, Any]:
+        """Fetch live from the open sources; keep the previous data when every source fails."""
+        raw = observed.fetch_all()
+        if not raw["osm"] and not raw["ocm"]:
+            prev = self.observed_raw()
+            return {**prev, "errors": {**raw["errors"], "refresh": "all sources failed; showing previous data"}}
+        observed.save(raw)
+        self._observed = {**raw, "origin": "cache"}
+        return self._observed
 
     def add_open_charging_scenario(self, scenario: dict[str, Any], keep: int) -> None:
         self.open_charging_scenarios = [*self.open_charging_scenarios, scenario][-keep:]

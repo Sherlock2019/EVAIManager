@@ -54,7 +54,7 @@ export default function Pricing({ demoBids }: { demoBids: Bid[] }) {
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_400px]">
         <Panel title="Price scenario" kicker="Default hierarchy: VinFast lowest · Tesla middle · other brands highest (VAT-inclusive, as displayed)">
           <div className="grid gap-3 md:grid-cols-3">
-            <NumField label="VinFast tariff" k="tariff_vinfast" unit="₫/kWh" step={100} />
+            <NumField label="VinFast tariff" k="tariff_vinfast" unit="₫/kWh" step={100} hint="Enter V-Green's published tariff here by hand to replace the illustrative value" />
             <NumField label="Tesla tariff" k="tariff_tesla" unit="₫/kWh" step={100} />
             <NumField label="Other brands tariff" k="tariff_other" unit="₫/kWh" step={100} />
             <NumField label="VinFast discount" k="vinfast_discount_pct" unit="%" max={100} />

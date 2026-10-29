@@ -18,6 +18,12 @@ FLEET_SIZE = int(os.getenv("FLEET_SIZE", "1250"))
 FRAME_COUNT = int(os.getenv("ADAS_FRAME_COUNT", "5000"))
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")
 
+# Observed (real) charging-station locations: OpenStreetMap via Overpass, plus Open Charge Map when a free key is set.
+# comma-separated; tried in order (public Overpass servers are often busy)
+OVERPASS_URLS = os.getenv("OVERPASS_URLS", "https://overpass-api.de/api/interpreter,https://overpass.private.coffee/api/interpreter,https://overpass.kumi.systems/api/interpreter").split(",")
+OCM_API_KEY = os.getenv("OCM_API_KEY", "")
+OBSERVED_CACHE = DATA_DIR / "observed_chargers.json"
+
 DISCLAIMER = (
     "Independent technology demonstration using synthetic data. "
     "Not an official VinFast product."

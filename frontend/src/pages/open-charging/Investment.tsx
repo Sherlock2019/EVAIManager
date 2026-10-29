@@ -8,6 +8,7 @@ import { useApi } from "../../lib/api";
 import { C, CHARGER_STATUS, toneColor } from "../../lib/format";
 import { CITY_VIEWS, pilotIcon, vinfastStationIcon } from "../../lib/map";
 import { ACTION_TONE, GROUPS, GROUP_COLOR, GROUP_LABEL, fmtRoi, fmtVnd, fmtWait, fmtYears, type Assumptions, type ByGroup, type Evaluation, type Group, type OcTab, type Site, useOc } from "../../lib/openCharging";
+import { type ObservedStation, type ObservedView, observedIcon, observedPopup } from "../../lib/observed";
 import { pickPilot, pilotPopup, pilotTeslaPorts, popupRow } from "../../lib/pilot";
 import type { Charger } from "../../lib/types";
 import { CompatBadge, GroupBadge, ProvenanceTags, REGIONS, type Region } from "./shared";
@@ -309,6 +310,29 @@ export default function Investment({ ev, goto }: { ev: Evaluation; goto: (t: OcT
   const select = useOc((s) => s.selectSite);
 
   const chargers = useApi<Charger[]>("/api/chargers");
+  const [showReal, setShowReal] = useState(true);
+  const real = useApi<ObservedView>("/api/chargers/observed");
+  // observed stations follow the region and brand filters; open data has no Tesla-specific stations
+  const realStations = useMemo(() => {
+    if (!real.data || !showReal) return [];
+    const reg = (s: ObservedStation): Region => (s.region === "Ho Chi Minh City" ? "HCMC" : s.region === "Hanoi" ? "Hanoi" : "Corridor");
+    return real.data.stations.filter(
+      (s) => (region === "All" || reg(s) === region) && (brand === "all" || (brand === "vinfast" && s.brand === "vinfast") || (brand === "other" && s.brand === "other")),
+    );
+  }, [real.data, showReal, region, brand]);
+
+  useEffect(() => {
+    if (!map || !real.data) return;
+    const group = L.layerGroup();
+    for (const s of realStations) {
+      L.marker([s.latitude, s.longitude], { icon: observedIcon(s), zIndexOffset: 1100 })
+        .bindTooltip(`Real station (observed): ${s.name}`, { direction: "top", offset: [0, -8] })
+        .bindPopup(observedPopup(s, real.data.attribution))
+        .addTo(group);
+    }
+    group.addTo(map);
+    return () => void group.remove();
+  }, [map, realStations, real.data]);
   const pilot = useMemo(() => (chargers.data ? pickPilot(chargers.data) : []), [chargers.data]);
   const pilotRank = useMemo(() => new Map(pilot.map((c, i) => [c.station_id, i + 1])), [pilot]);
   const pilotIds = useMemo(() => new Set(pilotRank.keys()), [pilotRank]);
@@ -405,7 +429,18 @@ export default function Investment({ ev, goto }: { ev: Evaluation; goto: (t: OcT
             ),
           }))}
         />
-        <Tabs value={layer} onChange={setLayer} options={[{ value: "both", label: "Network + analysis sites" }, { value: "network", label: `Charging network (${chargers.data?.length ?? "…"})` }, { value: "analysis", label: `Analysis sites (${ev.sites.length})` }]} />
+        <Tabs value={layer} onChange={setLayer} options={[{ value: "both", label: "Network + analysis sites" }, { value: "network", label: `Synthetic network (${chargers.data?.length ?? "…"})` }, { value: "analysis", label: `Analysis sites (${ev.sites.length})` }]} />
+        <button
+          onClick={() => setShowReal((v) => !v)}
+          aria-pressed={showReal}
+          title="Real charging-station locations from OpenStreetMap (observed open data, no live status or price)"
+          className={clsx(
+            "inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-2xs font-semibold transition-colors",
+            showReal ? "bg-ink text-abyss" : "border border-ink/50 text-ink hover:bg-ink/10",
+          )}
+        >
+          <span className="h-2.5 w-2.5 rounded-full ring-2 ring-current" /> Real stations · observed{real.data ? ` (${realStations.length || real.data.counts.total})` : ""}
+        </button>
       </div>
       <div className="flex flex-wrap items-center gap-3">
         <Tabs value={region} onChange={setRegion} options={REGIONS.map((r) => ({ value: r, label: r === "Airports" ? "✈ Airports" : r === "Corridor" ? "Corridor & other cities" : r }))} />
@@ -433,7 +468,13 @@ export default function Investment({ ev, goto }: { ev: Evaluation; goto: (t: OcT
                   <img src="/brands/tesla.png" alt="" width={11} height={11} className="rounded-full ring-1 ring-[#E31937]" />
                   Tesla opportunity (underused)
                 </span>
-                <span className="text-ink-2">VinFast-only stations, ring = load:</span>
+                {showReal && real.data && (
+                  <span className="flex items-center gap-1 text-ink">
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#6B7A90] ring-2 ring-white" />
+                    real station, white ring (observed, {real.data.attribution.replace("Station data ", "")})
+                  </span>
+                )}
+                <span className="text-ink-2">Synthetic VinFast-only stations, ring = load:</span>
                 {["normal", "high", "overloaded", "low"].map((k) => (
                   <span key={k} className="flex items-center gap-1">
                     <img src="/brands/vinfast.png" alt="" width={11} height={11} className="rounded-full" style={{ boxShadow: `0 0 0 2px ${CHARGER_STATUS[k].color}` }} />

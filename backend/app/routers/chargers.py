@@ -5,7 +5,7 @@ from typing import Any
 from fastapi import APIRouter, Depends
 
 from app.schemas.fleet import Charger
-from app.services import charger_optimizer, grid_capacity
+from app.services import charger_optimizer, grid_capacity, observed_chargers
 from app.services.charger_optimizer import Scenario
 from app.state import repo
 
@@ -29,6 +29,18 @@ def list_chargers(city: str | None = None) -> list[dict[str, Any]]:
 def grid() -> dict[str, Any]:
     """Synthetic power-grid nodes with EV hosting capacity versus the peak need of the stations they feed."""
     return grid_capacity.grid_view(repo.chargers)
+
+
+@router.get("/observed")
+def observed() -> dict[str, Any]:
+    """Real charging-station locations from OpenStreetMap (+ Open Charge Map when keyed). Observed data, kept separate from the synthetic network."""
+    return observed_chargers.build(repo.observed_raw())
+
+
+@router.post("/observed/refresh")
+def refresh_observed() -> dict[str, Any]:
+    """Re-fetch from the open sources and cache the result. Falls back to the previous data if every source fails."""
+    return observed_chargers.build(repo.refresh_observed())
 
 
 @router.get("/recommendations")
