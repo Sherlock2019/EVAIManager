@@ -41,7 +41,7 @@ const accessLine = (a: ByGroup<boolean>) =>
 function networkPopup(c: Charger): string {
   const st = CHARGER_STATUS[c.status];
   return `<div style="min-width:220px">
-    <div style="font:500 9px 'JetBrains Mono',monospace;letter-spacing:.14em;color:#64748B">CHARGING NETWORK STATION · SYNTHETIC</div>
+    <div style="font:500 9px 'JetBrains Mono',monospace;letter-spacing:.14em;color:#64748B">VINFAST-ONLY STATION · SYNTHETIC</div>
     <div style="font-weight:600;font-size:13px;margin-top:3px">${c.name}</div>
     <div style="margin:2px 0 8px;font-size:11px;color:${st.color}">${st.label} · ${c.city}</div>
     ${popupRow("Ports", `${c.ports} · ${c.power_kw} kW`)}${popupRow("Available now", c.available)}${popupRow("Utilization", `${Math.round(c.utilization * 100)}%`)}
@@ -349,7 +349,7 @@ export default function Investment({ ev, goto }: { ev: Evaluation; goto: (t: OcT
       const rank = pilotRank.get(c.station_id);
       const opp = opportunityIds.has(c.station_id);
       L.marker([c.latitude, c.longitude], { icon: rank ? pilotIcon(rank) : opp ? teslaOpportunityIcon() : chargerIcon(c.status, { size: 14 }), zIndexOffset: rank ? 700 : opp ? 600 : 0 })
-        .bindTooltip(`${c.name}${rank ? ` · hybrid pilot #${rank}` : opp ? " · Tesla opportunity (underused)" : ""} · ${Math.round(c.utilization * 100)}% util. · ${c.avg_daily_sessions} sessions/day`, { direction: "top", offset: [0, -10] })
+        .bindTooltip(`${c.name}${rank ? ` · hybrid pilot #${rank}` : opp ? " · VinFast-only, Tesla opportunity (underused)" : " · VinFast-only"} · ${Math.round(c.utilization * 100)}% util. · ${c.avg_daily_sessions} sessions/day`, { direction: "top", offset: [0, -10] })
         .bindPopup(rank ? pilotPopup(c, rank) : networkPopup(c))
         .addTo(group);
     }
@@ -433,10 +433,13 @@ export default function Investment({ ev, goto }: { ev: Evaluation; goto: (t: OcT
                   <img src="/brands/tesla.png" alt="" width={11} height={11} className="rounded-full ring-1 ring-[#E31937]" />
                   Tesla opportunity (underused)
                 </span>
+                <span className="flex items-center gap-1 text-ink-2">
+                  <img src="/brands/vinfast.png" alt="" width={11} height={11} className="rounded-sm" />
+                  VinFast-only stations, colour = load:
+                </span>
                 {["normal", "high", "overloaded", "low"].map((k) => (
                   <span key={k} className="flex items-center gap-1"><span className="h-2 w-2 rounded-sm" style={{ background: CHARGER_STATUS[k].color }} />{CHARGER_STATUS[k].label}</span>
                 ))}
-                <span>(small = network station)</span>
               </div>
             </MapOverlay>
           </MapView>

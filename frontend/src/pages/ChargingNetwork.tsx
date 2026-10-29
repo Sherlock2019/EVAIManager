@@ -304,6 +304,9 @@ export default function ChargingNetwork() {
               </div>
             </MapOverlay>
             <MapOverlay position="bl" className="px-3 py-2">
+              <div className="mb-1 flex items-center gap-1.5 text-2xs text-ink-2">
+                <img src="/brands/vinfast.png" alt="" width={11} height={11} className="rounded-sm" /> VinFast-only stations · colour = load
+              </div>
               <Legend
                 items={[
                   ...["normal", "high", "overloaded", "low"].map((k) => ({ label: CHARGER_STATUS[k].label, color: CHARGER_STATUS[k].color, shape: "square" as const })),
