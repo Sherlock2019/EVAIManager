@@ -197,6 +197,33 @@ export interface Charger {
   add_ports: number;
 }
 
+export type GridStatus = "ok" | "watch" | "constrained" | "over_capacity";
+
+export interface GridNode {
+  node_id: string;
+  name: string;
+  city: string;
+  latitude: number;
+  longitude: number;
+  capacity_kw: number;
+  stations: string[];
+  installed_kw: number;
+  peak_need_kw: number;
+  need_90d_kw: number;
+  loading: number;
+  loading_90d: number;
+  headroom_kw: number;
+  status: GridStatus;
+  status_90d: GridStatus;
+}
+
+export interface GridView {
+  note: string;
+  thresholds: { watch: number; constrained: number };
+  nodes: GridNode[];
+  stations: Record<string, { node_id: string; installed_kw: number; peak_need_kw: number; need_90d_kw: number }>;
+}
+
 export interface SiteRecommendation {
   rank: number;
   name: string;

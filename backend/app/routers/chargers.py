@@ -5,7 +5,7 @@ from typing import Any
 from fastapi import APIRouter, Depends
 
 from app.schemas.fleet import Charger
-from app.services import charger_optimizer
+from app.services import charger_optimizer, grid_capacity
 from app.services.charger_optimizer import Scenario
 from app.state import repo
 
@@ -23,6 +23,12 @@ def list_chargers(city: str | None = None) -> list[dict[str, Any]]:
         a = actions[c["station_id"]]
         rows.append({**c, "action": a["action"], "recommendation": a["detail"], "add_ports": a["add_ports"]})
     return rows
+
+
+@router.get("/grid")
+def grid() -> dict[str, Any]:
+    """Synthetic power-grid nodes with EV hosting capacity versus the peak need of the stations they feed."""
+    return grid_capacity.grid_view(repo.chargers)
 
 
 @router.get("/recommendations")

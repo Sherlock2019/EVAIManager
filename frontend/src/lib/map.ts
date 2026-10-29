@@ -364,6 +364,42 @@ export function plannedIcon(unnecessary: boolean): L.DivIcon {
   });
 }
 
+export const GRID_STATUS: Record<string, { label: string; color: string }> = {
+  ok: { label: "Grid headroom OK", color: C.good },
+  watch: { label: "Watch (≥70 %)", color: C.warn },
+  constrained: { label: "Constrained (≥90 %)", color: C.serious },
+  over_capacity: { label: "Over capacity", color: C.crit },
+};
+
+/** Synthetic grid node: pylon mark plus a level meter of charging need vs EV hosting capacity. */
+export function gridNodeIcon(loading: number, status: string): L.DivIcon {
+  const color = GRID_STATUS[status]?.color ?? C.idle;
+  const pct = Math.round(loading * 100);
+  const pylon = '<path d="M8 1 4.5 15h1.6L8 7.5 9.9 15h1.6z M4 5h8M3 9h10" stroke="#EF4444" stroke-width="1.4" fill="none" stroke-linejoin="round"/>';
+  return L.divIcon({
+    className: "map-divicon",
+    iconSize: [44, 40],
+    iconAnchor: [22, 13],
+    html: `<div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+      <div style="width:26px;height:26px;border-radius:6px;background:#1A0A0C;border:1.5px solid #EF4444;box-shadow:0 0 0 2px #05080D,0 0 12px #EF444477;display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 16 16">${pylon}</svg></div>
+      <div style="width:44px;height:6px;border-radius:3px;background:#18212F;box-shadow:0 0 0 1.5px #05080D;overflow:hidden"><div style="width:${Math.min(100, pct)}%;height:100%;background:${color}"></div></div>
+      <div style="font:700 9px/9px 'JetBrains Mono',monospace;color:${color};text-shadow:0 0 3px #05080D">${pct}%</div></div>`,
+  });
+}
+
+/** Proposed hybrid VinFast + Tesla pilot station: both brand marks side by side (simulation only). */
+export function pilotIcon(rank: number, highlight = false): L.DivIcon {
+  const s = highlight ? 26 : 22;
+  const logo = (src: string, side: "left" | "right") =>
+    `<img src="/brands/${src}.png" alt="" width="${s}" height="${s}" style="display:block;border-radius:${side === "left" ? "6px 0 0 6px" : "0 6px 6px 0"}"/>`;
+  return L.divIcon({
+    className: "map-divicon",
+    iconSize: [s * 2 + 2, s],
+    iconAnchor: [s + 1, s / 2],
+    html: `<div style="position:relative;display:flex;gap:2px;padding:0;border-radius:7px;background:#E8EEF7;box-shadow:0 0 0 2px #05080D,0 0 ${highlight ? 22 : 12}px #3BC9F5">${logo("vinfast", "left")}${logo("tesla", "right")}<span style="position:absolute;top:-8px;right:-8px;min-width:15px;height:15px;padding:0 3px;border-radius:8px;background:#3BC9F5;color:#05080D;font:700 9px/15px 'JetBrains Mono',monospace;text-align:center;box-shadow:0 0 0 1.5px #05080D">${rank}</span></div>`,
+  });
+}
+
 export function eventIcon(color: string): L.DivIcon {
   return L.divIcon({
     className: "map-divicon",

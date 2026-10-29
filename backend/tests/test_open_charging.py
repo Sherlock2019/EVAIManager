@@ -273,3 +273,11 @@ def test_open_charging_api(client):
 
 def test_existing_charging_api_still_works(client):
     assert client.get("/api/chargers/recommendations").status_code == 200
+
+
+def test_grid_api_assigns_every_station(client):
+    chargers = client.get("/api/chargers").json()
+    grid = client.get("/api/chargers/grid").json()
+    assert set(grid["stations"]) == {c["station_id"] for c in chargers}
+    assert sum(len(n["stations"]) for n in grid["nodes"]) == len(chargers)
+    assert "SYNTHETIC" in grid["note"]

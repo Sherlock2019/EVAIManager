@@ -1,6 +1,6 @@
 import clsx from "clsx";
 import L from "leaflet";
-import { Ban, PlugZap, Plus, RotateCcw, Sparkles, TrendingUp } from "lucide-react";
+import { Ban, PlugZap, Plus, RotateCcw, Sparkles, TrendingUp, Zap } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { MapOverlay, MapView } from "../components/MapView";
@@ -9,8 +9,46 @@ import { useApi } from "../lib/api";
 import { useDemo } from "../lib/demo";
 import { C, CHARGER_STATUS, fmtInt, fmtUsd, titleCase } from "../lib/format";
 import { useLive } from "../lib/live";
-import { CITY_VIEWS, HeatLayer, chargerIcon, plannedIcon, siteIcon } from "../lib/map";
-import type { Charger, Plan, Scenario } from "../lib/types";
+import { CITY_VIEWS, GRID_STATUS, HeatLayer, chargerIcon, gridNodeIcon, pilotIcon, plannedIcon, siteIcon } from "../lib/map";
+import { PILOT_STATIONS, pickPilot, pilotPopup, pilotTeslaPorts } from "../lib/pilot";
+import type { Charger, GridNode, GridView, Plan, Scenario } from "../lib/types";
+
+const fmtMw = (kw: number) => `${(kw / 1000).toFixed(1)} MW`;
+
+// Typical relative charging load by hour of day (illustrative); each station's own peak window adds a bump.
+const HOUR_SHAPE = [0.3, 0.25, 0.22, 0.2, 0.2, 0.25, 0.45, 0.7, 0.85, 0.9, 0.95, 1.0, 1.0, 0.95, 0.9, 0.92, 1.0, 1.1, 1.2, 1.15, 1.0, 0.8, 0.6, 0.4];
+const PEAK_BUMP = 0.6;
+
+/** Network occupancy per hour: each station's curve averages to its utilization; ports-weighted across stations. */
+function occupancy24h(chargers: Charger[]) {
+  const hours = Array(24).fill(0);
+  let ports = 0;
+  for (const c of chargers) {
+    const start = Number(c.peak_window.slice(0, 2));
+    const w = HOUR_SHAPE.map((b, h) => b * (h >= start && h < start + 3 ? 1 + PEAK_BUMP : 1));
+    const mean = w.reduce((a, b) => a + b, 0) / 24;
+    w.forEach((x, h) => (hours[h] += c.ports * Math.min(1, (c.utilization * x) / mean)));
+    ports += c.ports;
+  }
+  const occ = hours.map((x) => x / (ports || 1));
+  const peak = Math.max(...occ);
+  return { hours: occ, avg: occ.reduce((a, b) => a + b, 0) / 24, peak, peakHour: occ.indexOf(peak) };
+}
+
+function gridPopup(n: GridNode): string {
+  const st = GRID_STATUS[n.status];
+  const pct = (x: number) => `${Math.round(x * 100)}%`;
+  return `<div style="min-width:230px">
+    <div style="font:500 9px 'JetBrains Mono',monospace;letter-spacing:.14em;color:#EF4444">POWER GRID NODE · SYNTHETIC</div>
+    <div style="font-weight:600;font-size:13px;margin:3px 0 2px">${n.name}</div>
+    <div style="font-size:11px;color:${st.color};margin-bottom:8px">${st.label} · ${n.city}</div>
+    <div style="height:8px;border-radius:4px;background:#18212F;position:relative;overflow:hidden;margin-bottom:6px"><div style="width:${Math.min(100, n.loading * 100)}%;height:100%;background:${st.color}"></div>
+    <span style="position:absolute;top:0;bottom:0;left:${Math.min(99, n.loading_90d * 100)}%;width:2px;background:#E8EEF7"></span></div>
+    ${row("EV hosting capacity", fmtMw(n.capacity_kw))}${row("Charging need at peak", `${fmtMw(n.peak_need_kw)} · ${pct(n.loading)}`)}
+    ${row("Need in 90 days", `${fmtMw(n.need_90d_kw)} · ${pct(n.loading_90d)}`)}${row("Headroom", fmtMw(n.headroom_kw))}
+    ${row("Stations fed", n.stations.length)}${row("Installed charger power", fmtMw(n.installed_kw))}
+    <div style="margin-top:6px;font-size:10px;color:#64748B">Invented node and capacity for the demo, not EVN data. Peak need = installed kW × utilization × 1.25 (capped).</div></div>`;
+}
 
 const BASELINE: Scenario = { ev_growth_pct: 30, avg_daily_km: 40, fast_charging_adoption_pct: 45, peak_concentration_pct: 50 };
 type Heat = "none" | "travel_density" | "charging_demand" | "charger_capacity";
@@ -30,13 +68,18 @@ const FACTOR_LABEL: Record<string, string> = {
 const row = (label: string, value: string | number) =>
   `<div style="display:flex;justify-content:space-between;gap:18px;padding:2px 0"><span style="color:#64748B">${label}</span><span style="font-family:'JetBrains Mono',monospace;color:#E8EEF7">${value}</span></div>`;
 
-function stationPopup(c: Charger, available: number, action?: { action: string; detail: string }): string {
+function stationPopup(c: Charger, available: number, action?: { action: string; detail: string }, grid?: GridView | null): string {
   const status = CHARGER_STATUS[c.status];
+  const g = grid?.stations[c.station_id];
+  const node = g && grid?.nodes.find((n) => n.node_id === g.node_id);
+  const gridRows = g && node
+    ? `<div style="margin-top:6px;padding-top:6px;border-top:1px solid #263347">${row("Grid node", node.name)}${row("Station peak need", `${Math.round(g.peak_need_kw)} kW of ${g.installed_kw} kW`)}${row("Node loading", `<span style="color:${GRID_STATUS[node.status].color}">${Math.round(node.loading * 100)}%</span>`)}</div>`
+    : "";
   return `<div style="min-width:216px">
     <div style="font-weight:600;font-size:13px">${c.name}</div>
     <div style="margin:2px 0 8px;display:flex;align-items:center;gap:6px;font-size:11px;color:${status.color}"><span style="width:7px;height:7px;border-radius:2px;background:${status.color}"></span>${status.label} · ${c.power_kw} kW</div>
     ${row("Chargers", c.ports)}${row("Available", available)}${row("Current utilization", `${Math.round(c.utilization * 100)}%`)}
-    ${row("Average daily sessions", c.avg_daily_sessions)}${row("Peak", c.peak_window)}${row("Forecast 90 days", `+${Math.round(c.forecast_90d_pct)}%`)}
+    ${row("Average daily sessions", c.avg_daily_sessions)}${row("Peak", c.peak_window)}${row("Forecast 90 days", `+${Math.round(c.forecast_90d_pct)}%`)}${gridRows}
     <div style="margin-top:8px;padding-top:8px;border-top:1px solid #263347">
       <div style="font:500 9px 'JetBrains Mono',monospace;letter-spacing:.14em;color:#3BC9F5">AI RECOMMENDATION</div>
       <div style="margin-top:3px;font-size:12px">${action ? `<b>${action.action}</b> — ${action.detail}` : c.recommendation ?? "—"}</div>
@@ -52,9 +95,17 @@ export default function ChargingNetwork() {
   const [heat, setHeat] = useState<Heat>("none");
   const [map, setMap] = useState<L.Map | null>(null);
   const [focus, setFocus] = useState<string | null>(null);
+  const [showPilot, setShowPilot] = useState(true);
+  const [showGrid, setShowGrid] = useState(false);
+  const grid = useApi<GridView>(showGrid ? "/api/chargers/grid" : null);
+  const gridRef = useRef<GridView | null>(null);
+  gridRef.current = showGrid ? grid.data : null;
   const demoOpen = useDemo((s) => s.open); // the docked demo panel narrows the map
 
   const chargers = useApi<Charger[]>("/api/chargers");
+  const pilot = useMemo(() => (chargers.data ? pickPilot(chargers.data) : []), [chargers.data]);
+  const occupancy = useMemo(() => (chargers.data ? occupancy24h(chargers.data) : null), [chargers.data]);
+  const pilotIds = useMemo(() => new Set(showPilot ? pilot.map((c) => c.station_id) : []), [pilot, showPilot]);
   const heatData = useApi<Record<string, number[][]>>("/api/routes/heatmap");
   const query = new URLSearchParams(Object.entries(applied).map(([k, v]) => [k, String(v)])).toString();
   const plan = useApi<Plan>(`/api/chargers/recommendations?${query}`);
@@ -84,6 +135,7 @@ export default function ChargingNetwork() {
     if (!map || !chargers.data) return;
     const group = L.layerGroup();
     chargers.data.forEach((c, idx) => {
+      if (pilotIds.has(c.station_id)) return; // drawn by the pilot layer instead
       const action = optimized ? plan.data?.station_actions[c.station_id] : undefined;
       const expand = action?.action === "EXPAND";
       const marker = L.marker([c.latitude, c.longitude], { icon: chargerIcon(c.status, { expand, highlight: expand, size: expand ? 22 : 18 }), zIndexOffset: expand ? 400 : 0 });
@@ -91,13 +143,47 @@ export default function ChargingNetwork() {
       marker.bindPopup(() => {
         const live = useLive.getState().chargerAvailability[idx] ?? c.available;
         const a = optimized ? planRef.current?.station_actions[c.station_id] : undefined;
-        return stationPopup(c, live, a);
+        return stationPopup(c, live, a, gridRef.current);
       });
       marker.addTo(group);
     });
     group.addTo(map);
     return () => void group.remove();
-  }, [map, chargers.data, optimized, plan.data]);
+  }, [map, chargers.data, optimized, plan.data, pilotIds]);
+
+  // power grid: feeder lines from each synthetic node to the stations it feeds, then the node with its level meter
+  useEffect(() => {
+    if (!map || !showGrid || !grid.data || !chargers.data) return;
+    const group = L.layerGroup();
+    const byId = new Map(chargers.data.map((c) => [c.station_id, c]));
+    for (const n of grid.data.nodes) {
+      const color = GRID_STATUS[n.status].color;
+      for (const id of n.stations) {
+        const c = byId.get(id);
+        if (c) L.polyline([[n.latitude, n.longitude], [c.latitude, c.longitude]], { pane: "routes", color, weight: 1.2, opacity: 0.55, interactive: false }).addTo(group);
+      }
+      L.marker([n.latitude, n.longitude], { icon: gridNodeIcon(n.loading, n.status), zIndexOffset: 1000 })
+        .bindTooltip(`${n.name} · ${fmtMw(n.peak_need_kw)} need / ${fmtMw(n.capacity_kw)} capacity`, { direction: "top", offset: [0, -14] })
+        .bindPopup(gridPopup(n))
+        .addTo(group);
+    }
+    group.addTo(map);
+    return () => void group.remove();
+  }, [map, showGrid, grid.data, chargers.data]);
+
+  // proposed hybrid VinFast + Tesla pilot stations
+  useEffect(() => {
+    if (!map || !showPilot) return;
+    const group = L.layerGroup();
+    pilot.forEach((c, i) => {
+      L.marker([c.latitude, c.longitude], { icon: pilotIcon(i + 1, focus === c.name), zIndexOffset: 900 })
+        .bindTooltip(`Hybrid pilot #${i + 1} · ${c.name}`, { direction: "top", offset: [0, -14] })
+        .bindPopup(pilotPopup(c, i + 1))
+        .addTo(group);
+    });
+    group.addTo(map);
+    return () => void group.remove();
+  }, [map, pilot, showPilot, focus]);
 
   // AI proposals: new sites and planned sites
   useEffect(() => {
@@ -197,6 +283,16 @@ export default function ChargingNetwork() {
                   { value: "charger_capacity", label: "Charger capacity" },
                 ]}
               />
+              <button
+                onClick={() => setShowGrid((v) => !v)}
+                aria-pressed={showGrid}
+                className={clsx(
+                  "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-2xs font-semibold transition-colors",
+                  showGrid ? "bg-crit text-white shadow-[0_0_14px_#EF444488]" : "border border-crit/60 bg-crit/10 text-crit hover:bg-crit/20",
+                )}
+              >
+                <Zap size={11} fill={showGrid ? "currentColor" : "none"} /> Power grid
+              </button>
             </MapOverlay>
             <MapOverlay position="tr" className={clsx("p-1", demoOpen && "hidden")}>
               <div className="flex gap-0.5">
@@ -214,6 +310,21 @@ export default function ChargingNetwork() {
                   { label: "Recommended future charger", color: C.info, shape: "diamond" as const },
                 ]}
               />
+              {showGrid && (
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-ink-2">
+                  <span className="text-crit">▣ grid node (synthetic) · bar = charging need ÷ capacity</span>
+                  {Object.values(GRID_STATUS).map((s) => (
+                    <span key={s.label} className="inline-flex items-center gap-1"><span className="h-0.5 w-3" style={{ background: s.color }} />{s.label}</span>
+                  ))}
+                </div>
+              )}
+              <button onClick={() => setShowPilot((v) => !v)} className={clsx("mt-1.5 flex items-center gap-1.5 rounded px-1 py-0.5 text-2xs transition-colors hover:bg-raised", showPilot ? "text-ink" : "text-ink-3")} aria-pressed={showPilot}>
+                <span className="flex gap-px rounded bg-ink p-px" style={{ opacity: showPilot ? 1 : 0.4 }}>
+                  <img src="/brands/vinfast.png" alt="" width={12} height={12} className="rounded-l-sm" />
+                  <img src="/brands/tesla.png" alt="" width={12} height={12} className="rounded-r-sm" />
+                </span>
+                Hybrid VinFast + Tesla pilot (proposed, top {PILOT_STATIONS}) · {showPilot ? "on" : "off"}
+              </button>
               {optimized && (
                 <div className="mt-1.5 flex flex-wrap gap-x-3.5 text-2xs text-ink-2">
                   <span><span className="num text-ink">+</span> expand station</span>
@@ -243,16 +354,105 @@ export default function ChargingNetwork() {
         </section>
 
         <div className="flex flex-col gap-3 xl:row-span-2">
-          <Panel title="Network Plan" kicker={optimized ? "AI recommendation" : "Current network"}>
+          {showGrid && grid.data && (
+            <Panel
+              title={<span className="flex items-center gap-2"><Zap size={13} className="text-crit" /> Power Grid vs Charging Need</span>}
+              kicker="Synthetic grid nodes · peak need ÷ EV hosting capacity · tick = 90 days"
+              bodyClassName="p-2 space-y-1 overflow-y-auto xl:max-h-[360px]"
+            >
+              {grid.data.nodes.map((n) => {
+                const st = GRID_STATUS[n.status];
+                return (
+                  <button
+                    key={n.node_id}
+                    onClick={() => focusOn({ name: n.name, lat: n.latitude, lon: n.longitude })}
+                    className={clsx("block w-full rounded-md border px-2.5 py-1.5 text-left transition-colors hover:bg-raised", focus === n.name ? "border-crit/60 bg-raised" : "border-line")}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-xs font-medium">{n.name}</span>
+                      <span className="num text-2xs" style={{ color: st.color }}>{Math.round(n.loading * 100)}%</span>
+                    </div>
+                    <div className="mt-1">
+                      <Meter value={Math.min(n.peak_need_kw, n.capacity_kw)} max={n.capacity_kw} marker={Math.min(n.need_90d_kw, n.capacity_kw)} tone={n.status === "ok" ? "good" : n.status === "watch" ? "warn" : n.status === "constrained" ? "serious" : "crit"} height={6} />
+                    </div>
+                    <div className="mt-1 flex justify-between text-3xs text-ink-3">
+                      <span>{n.city} · {n.stations.length} stations</span>
+                      <span className="num">{fmtMw(n.peak_need_kw)} / {fmtMw(n.capacity_kw)} · 90d {Math.round(n.loading_90d * 100)}%</span>
+                    </div>
+                  </button>
+                );
+              })}
+              <p className="px-1 pt-1 text-3xs leading-relaxed text-ink-3">{grid.data.note}</p>
+            </Panel>
+          )}
+          {showPilot && pilot.length > 0 && (
+            <Panel
+              title={
+                <span className="flex items-center gap-2">
+                  <span className="flex gap-px rounded bg-ink p-px">
+                    <img src="/brands/vinfast.png" alt="VinFast" width={16} height={16} className="rounded-l-sm" />
+                    <img src="/brands/tesla.png" alt="Tesla" width={16} height={16} className="rounded-r-sm" />
+                  </span>
+                  Hybrid VinFast + Tesla Pilot
+                </span>
+              }
+              kicker={`Proposed · ${PILOT_STATIONS} most-used stations · simulation`}
+              action={<Link to="/energy/open-charging" className="text-2xs text-accent hover:underline">Business case →</Link>}
+              bodyClassName="p-2 space-y-1 overflow-y-auto xl:max-h-[300px]"
+            >
+              {pilot.map((c, i) => (
+                <button
+                  key={c.station_id}
+                  onClick={() => focusOn({ name: c.name, lat: c.latitude, lon: c.longitude })}
+                  className={clsx("flex w-full items-center gap-2 rounded-md border px-2.5 py-1.5 text-left transition-colors hover:bg-raised", focus === c.name ? "border-accent/60 bg-raised" : "border-line")}
+                >
+                  <span className="num w-5 text-2xs text-accent">#{i + 1}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-xs font-medium">{c.name}</span>
+                    <span className="block text-3xs text-ink-3">{c.city} · {c.avg_daily_sessions} sessions/day · {Math.round(c.utilization * 100)}% util.</span>
+                  </span>
+                  <span className="num text-3xs text-ink-2">{pilotTeslaPorts(c)}/{c.ports} Tesla</span>
+                </button>
+              ))}
+              <p className="px-1 pt-1 text-3xs leading-relaxed text-ink-3">
+                VinFast keeps priority on every port; Tesla gets priority 2 on the pilot ports. Brand marks identify vehicle groups only: not affiliated with or endorsed by VinFast, Tesla or V-Green, and no such pilot is announced.
+              </p>
+            </Panel>
+          )}
+          <Panel className="order-first" title="VinFast Charger Network" kicker={optimized ? "AI recommendation" : "Current network · synthetic"}>
             <div className="flex items-end justify-between">
               <div>
-                <div className="label">Current network</div>
+                <div className="label">VinFast-only charger stations</div>
                 <div className="num mt-0.5 text-2xl font-medium leading-none">
-                  {s?.current_stations ?? "—"} <span className="text-xs text-ink-3">stations · {s ? fmtInt(s.current_ports) : "—"} ports</span>
+                  {s?.current_stations ?? "—"} <span className="text-xs text-ink-3">VinFast-only stations · {s ? fmtInt(s.current_ports) : "—"} ports</span>
                 </div>
               </div>
               {s && <Badge tone={s.demand_multiplier > 1.05 ? "warn" : s.demand_multiplier < 0.95 ? "idle" : "good"}>Demand ×{s.demand_multiplier.toFixed(2)}</Badge>}
             </div>
+            {occupancy && (
+              <div className="mt-3 rounded-md border border-line bg-raised px-3 py-2.5">
+                <div className="flex items-baseline justify-between">
+                  <span className="label">Occupancy rate · 24 h</span>
+                  <span className="num text-2xs text-ink-3">peak {occupancy.peakHour}:00 · {Math.round(occupancy.peak * 100)}%</span>
+                </div>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <span className="num text-2xl font-medium leading-none">{Math.round(occupancy.avg * 100)}%</span>
+                  <span className="text-3xs text-ink-3">24 h average · ports in use</span>
+                </div>
+                <div className="mt-2 flex h-12 items-end gap-px" role="img" aria-label="Occupancy by hour">
+                  {occupancy.hours.map((o, h) => (
+                    <div
+                      key={h}
+                      title={`${String(h).padStart(2, "0")}:00 · ${Math.round(o * 100)}%`}
+                      className="flex-1 rounded-t-sm"
+                      style={{ height: `${Math.max(4, o * 100)}%`, background: o >= 0.9 ? C.crit : o >= 0.75 ? C.warn : C.good, opacity: h === occupancy.peakHour ? 1 : 0.75 }}
+                    />
+                  ))}
+                </div>
+                <div className="mt-0.5 flex justify-between font-mono text-3xs text-ink-3"><span>00</span><span>06</span><span>12</span><span>18</span><span>23</span></div>
+                <p className="mt-1 text-3xs text-ink-3">Estimated from each station's utilization and peak window (typical daily charging curve), weighted by ports.</p>
+              </div>
+            )}
             {optimized && s ? (
               <div className="mt-3 grid animate-slide-in grid-cols-3 gap-2">
                 {[

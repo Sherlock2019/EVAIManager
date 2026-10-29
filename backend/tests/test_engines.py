@@ -4,7 +4,7 @@ from __future__ import annotations
 import numpy as np
 
 from app.services import adas_label_engine as label
-from app.services import charger_optimizer, edge_case_engine, maintenance_engine
+from app.services import charger_optimizer, edge_case_engine, grid_capacity, maintenance_engine
 from app.services.charger_optimizer import Scenario
 
 
@@ -100,3 +100,16 @@ def test_edge_case_priority_from_error_rate():
     assert edge_case_engine.priority(edge_case_engine.estimated_error_rate(0.68)) == "HIGH"
     assert edge_case_engine.priority(edge_case_engine.estimated_error_rate(0.73)) == "MEDIUM"
     assert edge_case_engine.priority(edge_case_engine.estimated_error_rate(0.88)) == "LOW"
+
+
+def test_grid_need_and_loading():
+    st = {"station_id": "S1", "city": "Hanoi", "latitude": 21.045, "longitude": 105.89, "ports": 10, "power_kw": 100, "utilization": 0.4, "forecast_90d_pct": 10}
+    need = grid_capacity.station_need(st)
+    assert need["installed_kw"] == 1000 and need["peak_need_kw"] == 500 and need["need_90d_kw"] == 550
+    busy = {**st, "station_id": "S2", "utilization": 0.95}
+    assert grid_capacity.station_need(busy)["peak_need_kw"] == 1000   # capped at installed power
+    view = grid_capacity.grid_view([st, busy])
+    node = next(n for n in view["nodes"] if n["node_id"] == view["stations"]["S1"]["node_id"])
+    assert node["city"] == "Hanoi" and node["peak_need_kw"] == 1500
+    assert node["loading"] == round(1500 / node["capacity_kw"], 3)
+    assert [grid_capacity.status(x) for x in (0.5, 0.75, 0.95, 1.2)] == ["ok", "watch", "constrained", "over_capacity"]
