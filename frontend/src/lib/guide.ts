@@ -192,6 +192,16 @@ export const PAGE_GUIDE: Record<string, PageGuideEntry> = {
     steps: ["Press AI Optimize Network.", "Blue diamonds are new sites, + marks stations to expand, ✕ marks plans to cancel.", "Move the what-if sliders to test growth scenarios."],
     main: true,
   },
+  "/energy/open-charging": {
+    title: "Vietnam Open Charging & Investment Intelligence",
+    purpose: "Where shared VinFast + Tesla + other-brand charging could pay off, how a priority queue protects VinFast drivers, and what each option earns.",
+    problem: "Opening VinFast-only capacity to other brands can add revenue, or it can make VinFast drivers wait: the answer differs by site, airport and corridor.",
+    steps: [
+      "Press Load Demo Scenario, then filter Airports, HCMC, Hanoi or Corridor and open a site.",
+      "Priority Queue: play the busy period and toggle reserved ports or anti-starvation.",
+      "Pricing & Bids, Revenue and ROI: change prices or capex and watch revenue, ROI and payback update. Everything is synthetic; no partnership is implied.",
+    ],
+  },
   "/energy/routes": {
     title: "Route Intelligence",
     purpose: "The routes vehicles really drive, how busy each is, and heatmaps of travel and charging demand.",

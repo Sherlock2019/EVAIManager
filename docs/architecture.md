@@ -41,6 +41,8 @@ The loop closes from layer 7 back to layer 3: a reviewer's correction, a booked 
 │              review_service        model_metrics                │
 │              maintenance_engine    service_scheduler            │
 │              charger_optimizer     route_analyzer               │
+│              open_charging         charging_queue               │
+│              charging_pricing                                   │
 │              ride_demand           demand_model                 │
 │              telemetry_service     dashboard_service            │
 │              copilot               demo_orchestrator            │

@@ -1,8 +1,8 @@
 import clsx from "clsx";
 import L from "leaflet";
-import { Ban, Plus, RotateCcw, Sparkles, TrendingUp } from "lucide-react";
+import { Ban, PlugZap, Plus, RotateCcw, Sparkles, TrendingUp } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { MapOverlay, MapView } from "../components/MapView";
 import { Badge, Button, ErrorNote, Legend, Meter, MockTag, PageHeader, Panel, Slider, Tabs } from "../components/ui";
 import { useApi } from "../lib/api";
@@ -173,6 +173,9 @@ export default function ChargingNetwork() {
         description="Vehicle journeys show where charging demand actually exists. The planning engine scores new sites, sizes expansions — and flags planned capacity that demand does not justify."
       >
         <MockTag />
+        <Link to="/energy/open-charging" className="inline-flex h-8 items-center gap-1.5 rounded-md border border-line-strong bg-raised px-3 text-xs font-medium text-ink-2 hover:border-ink-3 hover:text-ink">
+          <PlugZap size={13} /> VinFast / Tesla / Other EV charging
+        </Link>
         <Button variant="primary" onClick={optimize} disabled={optimizing}>
           <Sparkles size={13} /> {optimizing ? "Optimizing…" : optimized ? "Re-run AI Optimize" : "AI Optimize Network"}
         </Button>

@@ -12,6 +12,7 @@ import HumanReview from "./pages/HumanReview";
 import LabelingPipeline from "./pages/LabelingPipeline";
 import Maintenance from "./pages/Maintenance";
 import ModelMetrics from "./pages/ModelMetrics";
+import OpenCharging from "./pages/OpenCharging";
 import Overview from "./pages/Overview";
 import RideDemand from "./pages/RideDemand";
 import RouteIntelligence from "./pages/RouteIntelligence";
@@ -33,6 +34,7 @@ export default function App() {
         <Route path="fleet/health" element={<VehicleHealth />} />
         <Route path="fleet/maintenance" element={<Maintenance />} />
         <Route path="energy/charging" element={<ChargingNetwork />} />
+        <Route path="energy/open-charging" element={<OpenCharging />} />
         <Route path="energy/routes" element={<RouteIntelligence />} />
         <Route path="energy/demand" element={<RideDemand />} />
         <Route path="energy/model" element={<DemandModel />} />

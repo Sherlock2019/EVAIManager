@@ -12,6 +12,7 @@ import {
   LineChart,
   Network,
   Play,
+  PlugZap,
   Radar,
   Route,
   ScanEye,
@@ -69,6 +70,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
     group: "Energy",
     items: [
       { to: "/energy/charging", label: "Charging Network", icon: BatteryCharging },
+      { to: "/energy/open-charging", label: "VinFast / Tesla / Other EV", icon: PlugZap },
       { to: "/energy/routes", label: "Route Intelligence", icon: Route },
       { to: "/energy/demand", label: "Ride Demand 24h", icon: Users },
       { to: "/energy/model", label: "Demand Forecast Model", icon: BrainCircuit },

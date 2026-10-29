@@ -32,6 +32,7 @@ class Repository:
         self.planned_sites: list[dict[str, Any]] = []
         self.bookings: list[dict[str, Any]] = []
         self.reviews: list[dict[str, Any]] = []
+        self.open_charging_scenarios: list[dict[str, Any]] = []
         self.anomaly_model = maintenance_engine.AnomalyModel()
         self._pristine: dict[str, dict[str, Any]] = {}
 
@@ -54,6 +55,8 @@ class Repository:
         self.planned_sites = world["planned_sites"]
         self.bookings = world["bookings"]
         self.reviews = world["reviews"]
+        # added later: databases created before this feature simply have no such document yet
+        self.open_charging_scenarios = world.get("open_charging_scenarios", [])
         self.anomaly_model.fit(self.vehicles)
         for v, anomaly in zip(self.vehicles, self.anomaly_model.score_many(self.vehicles)):
             self.refresh_prediction(v, anomaly)
@@ -110,6 +113,10 @@ class Repository:
     def add_booking(self, booking: dict[str, Any]) -> None:
         self.bookings.append(booking)
         database.insert_booking(booking)
+
+    def add_open_charging_scenario(self, scenario: dict[str, Any], keep: int) -> None:
+        self.open_charging_scenarios = [*self.open_charging_scenarios, scenario][-keep:]
+        database.save_document("open_charging_scenarios", self.open_charging_scenarios)
 
 
 def normalize_vehicle_id(raw: str) -> str:

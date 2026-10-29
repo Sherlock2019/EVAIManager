@@ -179,6 +179,9 @@ Each file in `backend/app/services` is one engine with explicit inputs and outpu
 | `maintenance_engine` | Risk score, predicted component, reason codes; IsolationForest anomaly score | `/api/maintenance/predictions` | Vehicle Health, Maintenance |
 | `service_scheduler` | Groups vehicles into a service plan | `/api/maintenance/optimize-schedule` | Maintenance |
 | `charger_optimizer` | Add, expand or do not build | `/api/chargers/recommendations` | Charging Network |
+| `open_charging` | Per site: keep VinFast-only, open spare capacity, add ports or build new; revenue A/B/C, ROI, payback, NPV, pilot | `/api/open-charging/evaluate`, `/pilot` | VinFast / Tesla / Other EV |
+| `charging_queue` | Priority queue (VinFast → Tesla → others) with compatibility, ageing, reserved ports | `/api/open-charging/queue/simulate` | VinFast / Tesla / Other EV |
+| `charging_pricing` | Transparent quotes and pay-as-bid slot allocation | `/api/open-charging/quote`, `/bids/simulate` | VinFast / Tesla / Other EV |
 | `route_analyzer` | Trips, replay samples, heatmaps | `/api/routes`, `/api/vehicles/{id}/route` | Route Intelligence |
 | `ride_demand` | 24-hour passengers, EV supply, trip flows, driver moves, charger sizing | `/api/rides/forecast` | Ride Demand 24h |
 | `demand_model` | Trained gradient-boosted forecast of pickups per zone-hour | `/api/rides/model`, `/predict` | Demand Forecast Model |
@@ -360,6 +363,12 @@ Then try the two centrepieces by hand:
 
 A spoken script for a 2-minute walkthrough is in [docs/demo-script.md](docs/demo-script.md).
 
+### Vietnam Open Charging & Investment Intelligence
+
+Sidebar **Energy → VinFast / Tesla / Other EV** (`/energy/open-charging`), also linked from the Charging Network page. An independent proposal on synthetic data: no Tesla, VinFast or V-Green partnership is announced or implied.
+
+Press **Load Demo Scenario**. Six tabs: Investment Opportunities (map of 15 synthetic sites in HCMC, Hanoi, corridors and the major airports, led by Long Thanh International; editable, explainable scores), Priority Queue (discrete-event simulator), Pricing & Bids, Revenue Dashboard (A VinFast-only, B + Tesla, C + other brands), ROI & Comparison, and Pilot Simulator. Walkthrough, formulas and what a real pilot would need: [docs/open-charging-demo.md](docs/open-charging-demo.md).
+
 ## API
 
 Interactive documentation: `/api/docs`.
@@ -378,6 +387,12 @@ Interactive documentation: `/api/docs`.
 | POST | `/api/maintenance/schedule/{id}` | Book service for a vehicle |
 | GET | `/api/chargers` | Stations with availability and recommendation |
 | GET | `/api/chargers/recommendations` | Planning engine; query params are the what-if sliders |
+| GET | `/api/open-charging/meta` | Default assumptions, weights, queue policy, formulas, disclaimer |
+| POST | `/api/open-charging/evaluate` | Scores, waits, revenue A/B/C, ROI options and recommendation for every synthetic site |
+| POST | `/api/open-charging/queue/simulate` | Priority queue simulation with snapshots, ETAs, stats and alerts |
+| POST | `/api/open-charging/quote`, `/bids/simulate` | Price quote; pay-as-bid slot round |
+| POST | `/api/open-charging/pilot` | Pilot simulation on selected existing sites |
+| GET/POST | `/api/open-charging/scenarios` | Saved assumption sets (stored in the SQLite `documents` table) |
 | GET | `/api/routes`, `/api/routes/heatmap` | Routes and density layers |
 | GET | `/api/rides/forecast` | 24-hour passenger demand, EV supply, trip flows, driver moves and charger sizing (`day=weekday\|weekend`) |
 | GET | `/api/rides/model` | Trained demand model: scores versus baseline, feature importance, test-week predictions |
@@ -420,6 +435,7 @@ Kubernetes examples: [deployment/k8s](deployment/k8s).
 - **The ride demand forecast is a zone model, not a trained network.** Hourly profiles per zone type, a gravity model for trips and a rule for where idle EVs wait; no real passenger, sensor or ride-hailing data. It covers Ho Chi Minh City only, and its charger sizing looks at today's busiest hour, so it differs from the 90-day plan on the Charging Network page.
 - **The maintenance model is a transparent scoring function**, calibrated on the synthetic fleet, not trained on service records.
 - **Single process, in-memory simulation.** Not built for concurrency or scale; SQLite persistence covers reviews, bookings and dataset counts only.
+- **Open charging module is a proposal on invented data.** Sites, demand, compatibility, grid status, tariffs and costs are synthetic or illustrative; waits are queueing estimates, not measurements. Brand priority, prices and bids are not claimed to be in use anywhere, and nothing triggers a real charger, reservation or payment.
 - **Kubernetes manifests are examples** and were not run against a cluster.
 - Files written to `./data` by Docker are owned by root; delete the folder (or `chown` it) before switching to development mode on Linux.
 
