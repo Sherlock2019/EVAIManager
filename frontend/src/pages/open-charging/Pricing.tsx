@@ -58,7 +58,7 @@ export default function Pricing({ demoBids }: { demoBids: Bid[] }) {
             <NumField label="Tesla tariff" k="tariff_tesla" unit="₫/kWh" step={100} />
             <NumField label="Other brands tariff" k="tariff_other" unit="₫/kWh" step={100} />
             <NumField label="VinFast discount" k="vinfast_discount_pct" unit="%" max={100} />
-            <NumField label="VinFast free-charging share" k="vinfast_free_share_pct" unit="% of kWh" max={100} hint="Share of VinFast kWh delivered free to eligible drivers" />
+            <NumField label="VinFast free charging (3 years)" k="vinfast_free_share_pct" unit="% of kWh" max={100} hint="VinFast EVs charge free for their first 3 years: share of VinFast kWh from vehicles still in that period" />
             <NumField label="Sponsor reimbursement" k="sponsor_reimbursement_vnd_per_kwh" unit="₫/kWh, 0 = none" step={100} hint="Only counted if a reimbursement agreement is modelled" />
             <NumField label="Third-party session fee" k="third_party_session_fee_vnd" unit="₫" step={1000} />
             <NumField label="VAT" k="vat_pct" unit="%" max={30} />

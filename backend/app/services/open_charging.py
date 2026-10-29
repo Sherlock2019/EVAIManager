@@ -244,7 +244,8 @@ class Assumptions(BaseModel):
     tariff_tesla: float = Field(4000, ge=0, le=20000)
     tariff_other: float = Field(4500, ge=0, le=20000)
     vinfast_discount_pct: float = Field(0, ge=0, le=100)
-    vinfast_free_share_pct: float = Field(0, ge=0, le=100, description="share of VinFast kWh delivered free to eligible drivers")
+    # VinFast EVs charge free for their first 3 years; this is the share of VinFast kWh from vehicles still inside that period
+    vinfast_free_share_pct: float = Field(80, ge=0, le=100, description="share of VinFast kWh delivered free (3-year free-charging period)")
     sponsor_reimbursement_vnd_per_kwh: float = Field(0, ge=0, le=20000, description="0 = no reimbursement agreement modelled")
     third_party_session_fee_vnd: float = Field(0, ge=0, le=500000)
     vat_pct: float = Field(10, ge=0, le=30)
@@ -655,7 +656,11 @@ def recommend(site: dict[str, Any], a: Assumptions, sc: dict[str, Any], options:
         if sc["score"] >= SCORE_THRESHOLD and opt["npv"] > 0 and wait_ok(opt):
             return _rec("Develop new hybrid site", "new_multibrand_site", "new_site",
                         [f"Score {sc['score']:.0f} ≥ {SCORE_THRESHOLD}", f"NPV positive over {a.horizon_years} years at {a.discount_rate_pct:.0f} %"], site)
-        return _rec("Investigate further", "defer", "new_site", [f"Score {sc['score']:.0f} or NPV does not yet justify a new build."], site)
+        why = [f"Score {sc['score']:.0f} or NPV ({opt['npv'] / 1e9:.1f}B VND) does not yet justify a new build."]
+        if a.vinfast_free_share_pct > 0 and a.sponsor_reimbursement_vnd_per_kwh == 0:
+            why.append(f"{a.vinfast_free_share_pct:.0f}% of VinFast charging is free (3-year programme) and no reimbursement is configured, "
+                       "so VinFast sessions add electricity cost but little revenue.")
+        return _rec("Investigate further", "defer", "new_site", why, site)
 
     open_, add = options["open_spare"], options["add_ports"]
     base_wait = base_op["waits"]["vinfast"]["avg"] if base_op else None

@@ -227,7 +227,11 @@ def test_recommendations_cover_the_demo_story():
     assert res["OC-HCM-02"]["recommendation"]["action"] == "Keep VinFast-only"       # congested
     assert res["OC-HN-01"]["recommendation"]["action"] == "Upgrade capacity"
     assert res["OC-COR-02"]["recommendation"]["action"] == "Investigate further"     # grid unknown
-    assert res["OC-AIR-LTH"]["recommendation"]["action"] == "Develop new hybrid site"
+    # 80 % of VinFast charging is free (3-year programme): a new build only pays when that is reimbursed
+    assert res["OC-AIR-LTH"]["recommendation"]["action"] == "Investigate further"
+    assert any("free" in r for r in res["OC-AIR-LTH"]["recommendation"]["reasons"])
+    reimbursed = {s["site_id"]: s for s in oc.evaluate(EvaluateRequest(assumptions=Assumptions(sponsor_reimbursement_vnd_per_kwh=2400)))["sites"]}
+    assert reimbursed["OC-AIR-LTH"]["recommendation"]["action"] == "Develop new hybrid site"
     for s in res.values():
         assert "SYNTHETIC SITE" in s["labels"]
 

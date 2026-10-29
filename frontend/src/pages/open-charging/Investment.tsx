@@ -57,103 +57,106 @@ const MAX_PRACTICAL_UTIL = 0.85;
 const POWER_DERATE = 0.8;
 const TESLA_SESSIONS_PER_PILOT_PORT = 3;   // assumed Tesla demand per opened port per day, before the capacity cap
 
-interface GroupTotals { stations: number; ports: number; portUsage: number; revVinfast: number; revTesla: number; revOther: number; teslaSessions: number }
+interface Day { stations: number; ports: number; teslaPorts: number; portUsage: number; vfSessions: number; tSessions: number; vfPaid: number; vfFree: number; reimbursed: number; tesla: number; energy: number; fees: number }
 
-function networkDay(c: Charger, a: Assumptions, tesla: boolean) {
+const emptyDay = (): Day => ({ stations: 0, ports: 0, teslaPorts: 0, portUsage: 0, vfSessions: 0, tSessions: 0, vfPaid: 0, vfFree: 0, reimbursed: 0, tesla: 0, energy: 0, fees: 0 });
+
+/** One day at a network station, VND excl. VAT. Free VinFast kWh (3-year programme) earn nothing unless a reimbursement is set. */
+function networkDay(c: Charger, a: Assumptions, tesla: boolean): Day {
   const vat = 1 + a.vat_pct / 100;
-  const vf = (c.avg_daily_sessions * a.kwh_vinfast * (1 - a.vinfast_free_share_pct / 100) * a.tariff_vinfast * (1 - a.vinfast_discount_pct / 100)) / vat;
+  const vfKwh = c.avg_daily_sessions * a.kwh_vinfast;
+  const freeKwh = (vfKwh * a.vinfast_free_share_pct) / 100;
+  const vfPaid = ((vfKwh - freeKwh) * a.tariff_vinfast * (1 - a.vinfast_discount_pct / 100)) / vat;
   const sessionH = a.kwh_tesla / (c.power_kw * POWER_DERATE);
   const spare = (Math.max(0, MAX_PRACTICAL_UTIL - c.utilization) * c.ports * OPERATING_HOURS) / sessionH;
   const tSessions = tesla ? Math.min(pilotTeslaPorts(c) * TESLA_SESSIONS_PER_PILOT_PORT, spare) : 0;
   const ts = (tSessions * (a.kwh_tesla * a.tariff_tesla + a.third_party_session_fee_vnd)) / vat;
-  return { vf, tesla: ts, tSessions, usage: Math.min(1, c.utilization + (tSessions * sessionH) / (c.ports * OPERATING_HOURS)) };
+  return {
+    stations: 1, ports: c.ports, teslaPorts: tesla ? pilotTeslaPorts(c) : 0,
+    portUsage: c.ports * Math.min(1, c.utilization + (tSessions * sessionH) / (c.ports * OPERATING_HOURS)),
+    vfSessions: c.avg_daily_sessions, tSessions,
+    vfPaid, vfFree: (freeKwh * a.tariff_vinfast) / vat, reimbursed: freeKwh * a.sponsor_reimbursement_vnd_per_kwh, tesla: ts,
+    energy: (vfKwh + tSessions * a.kwh_tesla) * a.energy_cost_vnd_per_kwh,
+    fees: ((vfPaid + ts) * vat * a.payment_fee_pct) / 100,
+  };
 }
 
-function BrandComparison({ ev, chargers, pilotIds }: { ev: Evaluation; chargers: Charger[]; pilotIds: Set<string> }) {
-  const a = useOc((s) => s.assumptions)!;
-  const empty = (): GroupTotals => ({ stations: 0, ports: 0, portUsage: 0, revVinfast: 0, revTesla: 0, revOther: 0, teslaSessions: 0 });
-  const vfOnly = empty();
-  const hybrid = empty();
-  for (const c of chargers) {
-    const isPilot = pilotIds.has(c.station_id);
-    const d = networkDay(c, a, isPilot);
-    const g = isPilot ? hybrid : vfOnly;
-    g.stations += 1;
-    g.ports += c.ports;
-    g.portUsage += c.ports * d.usage;
-    g.revVinfast += d.vf;
-    g.revTesla += d.tesla;
-    g.teslaSessions += d.tSessions;
-  }
-  const all = empty();
-  for (const s of ev.sites.filter((x) => siteAccess(x).other)) {
-    const blk = s.scenarios.C;
-    all.stations += 1;
-    all.ports += blk.ports;
-    all.portUsage += blk.ports * blk.utilization;
-    all.revVinfast += blk.year1.driver_revenue.vinfast / 365;
-    all.revTesla += blk.year1.driver_revenue.tesla / 365;
-    all.revOther += blk.year1.driver_revenue.other / 365;
-  }
-  const cols = [
-    { key: "vf", label: "VinFast-only", logos: ["vinfast"], g: vfOnly, src: "Charging network" },
-    { key: "vt", label: "VinFast + Tesla", logos: ["vinfast", "tesla"], g: hybrid, src: "Hybrid pilot (proposed)" },
-    { key: "all", label: "VinFast + Tesla + Other", logos: ["vinfast", "tesla", "other"], g: all, src: "Analysis sites to open" },
-  ];
-  const rev = (g: GroupTotals) => g.revVinfast + g.revTesla + g.revOther;
-  const perPort = (g: GroupTotals) => (g.ports ? rev(g) / g.ports : 0);
-  const usage = (g: GroupTotals) => (g.ports ? g.portUsage / g.ports : 0);
-  const best = Math.max(...cols.map((c) => perPort(c.g)));
-  const uplift = perPort(vfOnly) ? (perPort(hybrid) / perPort(vfOnly) - 1) * 100 : 0;
+function addDay(acc: Day, d: Day): Day {
+  (Object.keys(acc) as (keyof Day)[]).forEach((k) => (acc[k] += d[k]));
+  return acc;
+}
 
-  const rows: { label: string; v: (g: GroupTotals) => string; hi?: (g: GroupTotals) => boolean }[] = [
-    { label: "Stations", v: (g) => String(g.stations) },
-    { label: "Charging ports", v: (g) => String(g.ports) },
-    { label: "Average usage", v: (g) => `${Math.round(usage(g) * 100)}%` },
-    { label: "Revenue / day", v: (g) => fmtVnd(rev(g)) },
-    { label: "· from VinFast", v: (g) => fmtVnd(g.revVinfast) },
-    { label: "· from Tesla", v: (g) => (g.revTesla ? fmtVnd(g.revTesla) : "—") },
-    { label: "· from other brands", v: (g) => (g.revOther ? fmtVnd(g.revOther) : "—") },
-    { label: "Revenue / day per station", v: (g) => fmtVnd(g.stations ? rev(g) / g.stations : 0) },
-    { label: "Revenue / day per port", v: (g) => fmtVnd(perPort(g)), hi: (g) => perPort(g) === best },
+/** The same 10 pilot stations, VinFast-only versus VinFast + Tesla: the difference is only what Tesla adds. */
+function BrandComparison({ chargers, pilotIds }: { chargers: Charger[]; pilotIds: Set<string> }) {
+  const a = useOc((s) => s.assumptions)!;
+  const pilot = chargers.filter((c) => pilotIds.has(c.station_id));
+  const vfOnly = pilot.reduce((acc, c) => addDay(acc, networkDay(c, a, false)), emptyDay());
+  const hybrid = pilot.reduce((acc, c) => addDay(acc, networkDay(c, a, true)), emptyDay());
+  const rev = (d: Day) => d.vfPaid + d.reimbursed + d.tesla;
+  const contrib = (d: Day) => rev(d) - d.energy - d.fees;
+  const usage = (d: Day) => (d.ports ? d.portUsage / d.ports : 0);
+  const perPort = (d: Day) => (d.ports ? contrib(d) / d.ports : 0);
+
+  const money = (x: number) => fmtVnd(x);
+  const delta = (x: number, f: (n: number) => string = money) => (Math.abs(x) < 0.5 ? "—" : `${x > 0 ? "+" : "−"}${f(Math.abs(x))}`);
+  const rows: { label: string; v: (d: Day) => string; diff: string; cost?: boolean; strong?: boolean }[] = [
+    { label: "Stations", v: (d) => String(d.stations), diff: "same" },
+    { label: "Charging ports", v: (d) => (d.teslaPorts ? `${d.ports} (${d.teslaPorts} Tesla)` : String(d.ports)), diff: `+${hybrid.teslaPorts} Tesla` },
+    { label: "Average usage", v: (d) => `${Math.round(usage(d) * 100)}%`, diff: delta((usage(hybrid) - usage(vfOnly)) * 100, (n) => `${n.toFixed(0)} pts`) },
+    { label: "VinFast sessions / day", v: (d) => Math.round(d.vfSessions).toLocaleString("en-US"), diff: "—" },
+    { label: "Tesla sessions / day", v: (d) => (d.tSessions ? Math.round(d.tSessions).toLocaleString("en-US") : "—"), diff: delta(hybrid.tSessions, (n) => n.toFixed(0)) },
+    { label: "Revenue / day", v: (d) => money(rev(d)), diff: delta(rev(hybrid) - rev(vfOnly)), strong: true },
+    { label: "· VinFast paying drivers", v: (d) => money(d.vfPaid), diff: "—" },
+    { label: "· VinFast reimbursement", v: (d) => (d.reimbursed ? money(d.reimbursed) : "none set"), diff: "—" },
+    { label: "· Tesla drivers", v: (d) => (d.tesla ? money(d.tesla) : "—"), diff: delta(hybrid.tesla - vfOnly.tesla) },
+    { label: "Free VinFast charging given", v: (d) => money(d.vfFree), diff: "—", cost: true },
+    { label: "Electricity + payment fees", v: (d) => `−${money(d.energy + d.fees)}`, diff: delta(-(hybrid.energy + hybrid.fees - vfOnly.energy - vfOnly.fees)), cost: true },
+    { label: "Contribution / day", v: (d) => money(contrib(d)), diff: delta(contrib(hybrid) - contrib(vfOnly)), strong: true },
+    { label: "Contribution / day per port", v: (d) => money(perPort(d)), diff: delta(perPort(hybrid) - perPort(vfOnly)) },
   ];
+  const yearGain = (contrib(hybrid) - contrib(vfOnly)) * 365 - a.hybrid_platform_opex_vnd_year * pilot.length;
 
   return (
-    <Panel title="VinFast-only vs hybrid charging" kicker="Per day · VND excl. VAT · illustrative tariffs · estimate" bodyClassName="p-0">
+    <Panel title="10 VinFast-only vs 10 VinFast + Tesla" kicker="Same 10 pilot stations · per day · VND excl. VAT · illustrative · estimate" bodyClassName="p-0">
       <table className="w-full text-2xs">
         <thead>
           <tr className="border-b border-line">
             <th className="px-3 py-2 text-left font-normal text-ink-3" />
-            {cols.map((c) => (
-              <th key={c.key} className="px-2 py-2 text-right align-bottom font-normal">
-                <div className="flex justify-end gap-0.5">
-                  {c.logos.map((l) =>
-                    l === "other" ? <span key={l} className="h-3.5 w-3.5 rounded-sm" style={{ background: GROUP_COLOR.other }} title="Other EV brands" /> : <img key={l} src={`/brands/${l}.png`} alt={l} width={14} height={14} className="rounded-sm" />,
-                  )}
-                </div>
-                <div className="mt-1 font-medium text-ink">{c.label}</div>
-                <div className="text-3xs text-ink-3">{c.src}</div>
+            {[
+              { label: "VinFast-only", logos: ["vinfast"], sub: "today", free: true },
+              { label: "VinFast + Tesla", logos: ["vinfast", "tesla"], sub: "hybrid pilot", free: false },
+            ].map((h) => (
+              <th key={h.label} className="px-2 py-2 text-right align-bottom font-normal">
+                <div className="flex justify-end gap-0.5">{h.logos.map((l) => <img key={l} src={`/brands/${l}.png`} alt={l} width={14} height={14} className="rounded-sm" />)}</div>
+                <div className="mt-1 font-medium text-ink">{h.label}</div>
+                <div className="text-3xs text-ink-3">{h.sub}</div>
+                {h.free && (
+                  <div className="mt-1 inline-block rounded border border-good/40 bg-good/10 px-1 py-px text-3xs font-medium text-good" title={`${a.vinfast_free_share_pct}% of VinFast kWh assumed inside the free period`}>
+                    VinFast EVs: 3 years free charging
+                  </div>
+                )}
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.label} className="border-b border-line last:border-0">
-              <td className={clsx("px-3 py-1", r.label.startsWith("·") ? "pl-5 text-ink-3" : "text-ink-2")}>{r.label}</td>
-              {cols.map((c) => (
-                <td key={c.key} className="num px-2 py-1 text-right" style={r.hi?.(c.g) ? { color: C.good, fontWeight: 600 } : undefined}>{r.v(c.g)}</td>
-              ))}
+            <tr key={r.label} className={clsx("border-b border-line last:border-0", r.strong && "font-medium")}>
+              <td className={clsx("px-3 py-1", r.label.startsWith("·") ? "pl-5 text-ink-3" : r.cost ? "text-ink-3" : "text-ink-2")}>{r.label}</td>
+              <td className="num px-2 py-1 text-right">{r.v(vfOnly)}</td>
+              <td className="num px-2 py-1 text-right" style={r.strong && r.diff.startsWith("+") ? { color: C.good } : undefined}>{r.v(hybrid)}</td>
             </tr>
           ))}
         </tbody>
       </table>
       <div className="space-y-1 border-t border-line px-3 py-2 text-3xs leading-relaxed text-ink-3">
         <div>
-          Per port, the pilot stations earn <b className="text-ink">{uplift >= 0 ? "+" : ""}{uplift.toFixed(0)}%</b> vs VinFast-only, mostly because they are the busiest stations.
-          Tesla itself adds <b className="text-ink">+{hybrid.revVinfast ? ((hybrid.revTesla / hybrid.revVinfast) * 100).toFixed(0) : 0}%</b> on top ({Math.round(hybrid.teslaSessions)} sessions/day), capped by spare capacity ({Math.round(MAX_PRACTICAL_UTIL * 100)}% ceiling); quieter stations have more room for Tesla.
+          Tesla adds <b className="text-ink">{fmtVnd(hybrid.tesla)}</b> revenue and <b className="text-ink">{delta(contrib(hybrid) - contrib(vfOnly))}</b> contribution per day ({Math.round(hybrid.tSessions)} sessions),
+          about <b className="text-ink">{fmtVnd(yearGain)}</b> a year after {fmtVnd(a.hybrid_platform_opex_vnd_year)} platform cost per station.
+          VinFast drivers keep priority and still charge free: {a.vinfast_free_share_pct}% of VinFast kWh is inside the 3-year free-charging period
+          {a.sponsor_reimbursement_vnd_per_kwh ? `, reimbursed at ${a.sponsor_reimbursement_vnd_per_kwh.toLocaleString("en-US")} ₫/kWh.` : ", with no reimbursement set (change in Pricing & Bids)."}
         </div>
-        <div>Network stations: sessions × kWh × tariff ÷ (1 + VAT); Tesla = min({TESLA_SESSIONS_PER_PILOT_PORT}/opened port, spare capacity). Analysis sites: scenario C, year-1 daily average. Synthetic data.</div>
+        <div>Tesla = min({TESLA_SESSIONS_PER_PILOT_PORT} sessions per opened port, spare capacity to {Math.round(MAX_PRACTICAL_UTIL * 100)}%). These are the busiest stations, so spare capacity limits Tesla. Synthetic data.</div>
       </div>
     </Panel>
   );
@@ -188,9 +191,9 @@ function opportunity(c: Charger, a: Assumptions): Opportunity {
 function teslaOpportunityIcon(): L.DivIcon {
   return L.divIcon({
     className: "map-divicon",
-    iconSize: [20, 20],
-    iconAnchor: [10, 10],
-    html: `<div style="width:20px;height:20px;border-radius:50%;overflow:hidden;box-shadow:0 0 0 2px #05080D,0 0 0 3.5px #E31937,0 0 10px #E3193799"><img src="/brands/tesla.png" width="20" height="20" alt=""/></div>`,
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
+    html: `<div style="width:16px;height:16px;border-radius:50%;overflow:hidden;box-shadow:0 0 0 1.5px #05080D,0 0 0 3px #E31937,0 0 8px #E3193799"><img src="/brands/tesla.png" alt="" style="display:block;width:16px;height:16px;max-width:none"/></div>`,
   });
 }
 
@@ -443,7 +446,7 @@ export default function Investment({ ev, goto }: { ev: Evaluation; goto: (t: OcT
           )}
         </div>
         <div className="flex min-w-0 flex-col gap-3">
-          {chargers.data && <BrandComparison ev={ev} chargers={chargers.data} pilotIds={pilotIds} />}
+          {chargers.data && <BrandComparison chargers={chargers.data} pilotIds={pilotIds} />}
           <SiteDetail site={site} goto={goto} />
         </div>
       </div>

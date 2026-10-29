@@ -8,7 +8,8 @@ Open it from **Energy → VinFast / Tesla / Other EV** in the sidebar, or from t
 
 1. **Existing network (20 s).** Open **Charging Network**. "This is today's charging planner: where to add, expand or not build." Click **VinFast / Tesla / Other EV charging**.
 2. **Load the scenario (10 s).** Press **Load Demo Scenario**. Point at the orange banner: independent simulation, illustrative prices.
-3. **Opportunity map (40 s).** Filter **✈ Airports**. The pin colour is the suggestion, the number is the score and the halo is simulated demand. **Long Thanh International** is selected: a new-build hybrid site with a score of about 81, payback of about 4 years and a VinFast peak wait of about 6 min against a 10 min target.
+3. **Opportunity map (40 s).** Filter **✈ Airports**. The pin colour is the suggestion, the number is the score and the halo is simulated demand. **Long Thanh International** is selected. VinFast EVs charge free for their first 3 years (80 % of VinFast kWh by default, no reimbursement), so a new build is *Investigate further*. In **Pricing & Bids**, set a VinFast reimbursement of 2,400 ₫/kWh and it flips to *Develop new hybrid site* (payback about 5 years). *Who funds free charging decides whether new sites pay.*
+   The **10 VinFast-only vs 10 VinFast + Tesla** card compares the same 10 busiest stations both ways: Tesla adds revenue, but these stations have little spare room. The **Tesla opportunities** panel lists the 10 most underused VinFast-only stations in HCMC, Hanoi and Da Nang.
 4. **A promising hybrid site (30 s).** Filter **HCMC** and click **Riverside Mall D7**. Utilization is low, so the suggestion is to open selected spare capacity. Scroll the detail panel: compatibility is *unverified* for Tesla, the risks are listed, and the next validation step is named.
 5. **Compare economics (40 s).** Press **Compare Scenarios** to open ROI & Comparison. Compare *Open spare capacity* against *Add ports*: capex, cumulative cash flow and sensitivity. Change **Energy cost** or **Capex scale** and watch ROI and payback move.
 6. **Priority queue (60 s).** Open **Priority Queue** and press **Play**. VinFast (P1), Tesla (P2) and other-brand (P3) vehicles arrive. Point out:
@@ -30,6 +31,7 @@ Open it from **Energy → VinFast / Tesla / Other EV** in the sidebar, or from t
 | Demand | Simulated sessions/day per group | Scaled by *Demand / utilization* and *Annual growth*; third-party demand ramps up over 6 months |
 | Compatibility | Assumed | `unverified` is admitted by default in the economics (switchable) but not in the queue (switchable) |
 | Prices | Illustrative, VAT-inclusive | VinFast 3,000 · Tesla 4,000 · other 4,500 ₫/kWh. **Not current tariffs** |
+| VinFast free charging | Assumption | VinFast EVs charge free for 3 years: 80 % of VinFast kWh earns nothing (still costs electricity) unless a reimbursement per kWh is set |
 | Costs | Illustrative | Energy 2,400 ₫/kWh, 2 % payment fee, maintenance 20M ₫ per port per year, hybrid platform 60M ₫ per year |
 | Queue | Seeded busy period (seed 7) | 6 ports, 44 arrivals, scripted no-shows, a cancellation, an outage and an unverified vehicle |
 

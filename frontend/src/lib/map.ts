@@ -389,14 +389,15 @@ export function gridNodeIcon(loading: number, status: string): L.DivIcon {
 
 /** Proposed hybrid VinFast + Tesla pilot station: both brand marks side by side (simulation only). */
 export function pilotIcon(rank: number, highlight = false): L.DivIcon {
-  const s = highlight ? 26 : 22;
-  const logo = (src: string, side: "left" | "right") =>
-    `<img src="/brands/${src}.png" alt="" width="${s}" height="${s}" style="display:block;border-radius:${side === "left" ? "6px 0 0 6px" : "0 6px 6px 0"}"/>`;
+  const s = highlight ? 18 : 16;
+  // explicit inline size: Leaflet's CSS sets `width: auto` on marker images, which would show them at full resolution
+  const logo = (src: string) =>
+    `<img src="/brands/${src}.png" alt="" style="display:block;width:${s}px;height:${s}px;max-width:none;border-radius:50%;box-shadow:0 0 0 1.5px #05080D"/>`;
   return L.divIcon({
     className: "map-divicon",
-    iconSize: [s * 2 + 2, s],
-    iconAnchor: [s + 1, s / 2],
-    html: `<div style="position:relative;display:flex;gap:2px;padding:0;border-radius:7px;background:#E8EEF7;box-shadow:0 0 0 2px #05080D,0 0 ${highlight ? 22 : 12}px #3BC9F5">${logo("vinfast", "left")}${logo("tesla", "right")}<span style="position:absolute;top:-8px;right:-8px;min-width:15px;height:15px;padding:0 3px;border-radius:8px;background:#3BC9F5;color:#05080D;font:700 9px/15px 'JetBrains Mono',monospace;text-align:center;box-shadow:0 0 0 1.5px #05080D">${rank}</span></div>`,
+    iconSize: [s * 2 - 3, s],
+    iconAnchor: [s - 1.5, s / 2],
+    html: `<div style="position:relative;display:flex;filter:drop-shadow(0 0 ${highlight ? 6 : 3}px #3BC9F5)"><span style="z-index:1">${logo("vinfast")}</span><span style="margin-left:-3px">${logo("tesla")}</span><span style="position:absolute;top:-7px;right:-7px;z-index:2;min-width:12px;height:12px;padding:0 2px;border-radius:6px;background:#3BC9F5;color:#05080D;font:700 8px/12px 'JetBrains Mono',monospace;text-align:center;box-shadow:0 0 0 1px #05080D">${rank}</span></div>`,
   });
 }
 
